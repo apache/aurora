@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
-import java.util.Iterator;
 import java.util.Optional;
 
 import javax.inject.Inject;
@@ -27,6 +26,8 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.v1.Protos.AgentID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -51,6 +52,8 @@ public interface Preemptor {
       MutableStoreProvider storeProvider);
 
   class PreemptorImpl implements Preemptor {
+    private static final Logger LOG = LoggerFactory.getLogger(PreemptorImpl.class);
+
     private final StateManager stateManager;
     private final OfferManager offerManager;
     private final PreemptionVictimFilter preemptionVictimFilter;
@@ -79,12 +82,9 @@ public interface Preemptor {
         MutableStoreProvider store) {
 
       TaskGroupKey groupKey = TaskGroupKey.from(pendingTask.getTask());
-      Iterator<PreemptionProposal> proposalIterator = slotCache.getByValue(groupKey).iterator();
 
       // A preemption slot is available -> attempt to preempt tasks.
-      while (proposalIterator.hasNext()) {
-        // Get the next available preemption slot.
-        PreemptionProposal slot = proposalIterator.next();
+      for (PreemptionProposal slot : slotCache.getByValue(groupKey)) {
         slotCache.remove(slot, groupKey);
 
         // Validate PreemptionProposal is still valid for the given task.
@@ -97,10 +97,13 @@ public interface Preemptor {
                 offerManager.get(slaveId),
                 store);
 
-        metrics.recordSlotValidationResult(validatedVictims);
+        metrics.recordSlotValidationResult(validatedVictims, pendingTask);
         if (validatedVictims.isPresent()) {
           for (PreemptionVictim toPreempt : validatedVictims.get()) {
-            metrics.recordTaskPreemption(toPreempt);
+            LOG.info("Preempting {} in favor of {}",
+                toPreempt.getTaskId(),
+                pendingTask.getTaskId());
+            metrics.recordTaskPreemption(toPreempt, pendingTask);
             stateManager.changeState(
                 store,
                 toPreempt.getTaskId(),

@@ -46,21 +46,29 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.empty;
+import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.preemptedByJobStatName;
+import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.preemptedStatName;
+import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.preemptorByJobStatName;
+import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.slotValidationByJobStatName;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.slotValidationStatName;
-import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.successStatName;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class PreemptorImplTest extends EasyMockTest {
+  private static final String TASK_NAME = "preemptor-name";
+  private static final IScheduledTask TASK = IScheduledTask.build(makeTask(TASK_NAME));
   private static final String SLAVE_ID_1 = "slave_id_1";
   private static final String SLAVE_ID_2 = "slave_id_2";
-  private static final IScheduledTask TASK = IScheduledTask.build(makeTask());
-  private static final PreemptionProposal PROPOSAL_1 = createPreemptionProposal(TASK, SLAVE_ID_1);
-  private static final PreemptionProposal PROPOSAL_2 = createPreemptionProposal(TASK, SLAVE_ID_2);
+  private static final IScheduledTask SLAVE_1_TASK = IScheduledTask.build(makeTask(SLAVE_ID_1));
+  private static final IScheduledTask SLAVE_2_TASK = IScheduledTask.build(makeTask(SLAVE_ID_2));
+  private static final PreemptionProposal PROPOSAL_1 = createPreemptionProposal(SLAVE_1_TASK,
+      SLAVE_ID_1);
+  private static final PreemptionProposal PROPOSAL_2 = createPreemptionProposal(SLAVE_2_TASK,
+      SLAVE_ID_2);
   private static final TaskGroupKey GROUP_KEY =
-      TaskGroupKey.from(ITaskConfig.build(makeTask().getAssignedTask().getTask()));
+      TaskGroupKey.from(ITaskConfig.build(makeTask(TASK_NAME).getAssignedTask().getTask()));
 
   private static final Set<PreemptionProposal> NO_SLOTS = ImmutableSet.of();
   private static final Optional<String> EMPTY_RESULT = Optional.empty();
@@ -99,16 +107,22 @@ public class PreemptorImplTest extends EasyMockTest {
     expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1, PROPOSAL_2));
     slotCache.remove(PROPOSAL_1, GROUP_KEY);
     expectSlotValidation(PROPOSAL_1, Optional.of(ImmutableSet.of(
-        PreemptionVictim.fromTask(TASK.getAssignedTask()))));
+        PreemptionVictim.fromTask(SLAVE_1_TASK.getAssignedTask()))));
 
     expectPreempted(TASK);
 
     control.replay();
 
     assertEquals(Optional.of(SLAVE_ID_1), callPreemptor());
-    assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(false)));
     assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(true)));
-    assertEquals(1L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(slotValidationByJobStatName(true,
+        TASK.getAssignedTask().getTask().getJob())));
+    PROPOSAL_1.getVictims().forEach(victim ->
+        assertEquals(1L, statsProvider.getLongValue(preemptedByJobStatName(
+            victim.getConfig().getJob()))));
+    assertEquals(1L, statsProvider.getLongValue(preemptorByJobStatName(
+        TASK.getAssignedTask().getTask().getJob())));
+    assertEquals(1L, statsProvider.getLongValue(preemptedStatName(true)));
   }
 
   @Test
@@ -121,8 +135,9 @@ public class PreemptorImplTest extends EasyMockTest {
 
     assertEquals(EMPTY_RESULT, callPreemptor());
     assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(slotValidationByJobStatName(false,
+        TASK.getAssignedTask().getTask().getJob())));
+    assertEquals(0L, statsProvider.getLongValue(preemptedStatName(true)));
   }
 
   @Test
@@ -132,7 +147,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectSlotValidation(PROPOSAL_1, Optional.empty());
     slotCache.remove(PROPOSAL_2, GROUP_KEY);
     expectSlotValidation(PROPOSAL_2, Optional.of(ImmutableSet.of(
-        PreemptionVictim.fromTask(TASK.getAssignedTask()))));
+        PreemptionVictim.fromTask(SLAVE_2_TASK.getAssignedTask()))));
 
     expectPreempted(TASK);
 
@@ -140,8 +155,17 @@ public class PreemptorImplTest extends EasyMockTest {
 
     assertEquals(Optional.of(SLAVE_ID_2), callPreemptor());
     assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(slotValidationByJobStatName(false,
+        TASK.getAssignedTask().getTask().getJob())));
     assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(true)));
-    assertEquals(1L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(slotValidationByJobStatName(true,
+        TASK.getAssignedTask().getTask().getJob())));
+    PROPOSAL_2.getVictims().forEach(victim ->
+        assertEquals(1L, statsProvider.getLongValue(preemptedByJobStatName(
+            victim.getConfig().getJob()))));
+    assertEquals(1L, statsProvider.getLongValue(preemptorByJobStatName(
+        TASK.getAssignedTask().getTask().getJob())));
+    assertEquals(1L, statsProvider.getLongValue(preemptedStatName(true)));
   }
 
   @Test
@@ -156,8 +180,9 @@ public class PreemptorImplTest extends EasyMockTest {
 
     assertEquals(EMPTY_RESULT, callPreemptor());
     assertEquals(2L, statsProvider.getLongValue(slotValidationStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(2L, statsProvider.getLongValue(slotValidationByJobStatName(false,
+        TASK.getAssignedTask().getTask().getJob())));
+    assertEquals(0L, statsProvider.getLongValue(preemptedStatName(true)));
   }
 
   @Test
@@ -169,7 +194,7 @@ public class PreemptorImplTest extends EasyMockTest {
     assertEquals(EMPTY_RESULT, callPreemptor());
     assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(false)));
     assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(preemptedStatName(true)));
   }
 
   private Optional<String> callPreemptor() {
@@ -203,13 +228,13 @@ public class PreemptorImplTest extends EasyMockTest {
     return new PreemptionProposal(ImmutableSet.of(PreemptionVictim.fromTask(assigned)), slaveId);
   }
 
-  private static ScheduledTask makeTask() {
+  private static ScheduledTask makeTask(String name) {
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
                 .setPriority(1)
                 .setProduction(true)
-                .setJob(new JobKey("role", "env", "name"))));
+                .setJob(new JobKey("role", "env", name))));
     task.addToTaskEvents(new TaskEvent(0, PENDING));
     return task;
   }

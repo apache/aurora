@@ -21,7 +21,10 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.stats.CachedCounters;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.util.Objects.requireNonNull;
@@ -66,8 +69,8 @@ public class PreemptorMetrics {
     Set<String> allStats = ImmutableSet.of(
         attemptsStatName(false),
         attemptsStatName(true),
-        successStatName(false),
-        successStatName(true),
+        preemptedStatName(false),
+        preemptedStatName(true),
         slotSearchStatName(true, false),
         slotSearchStatName(false, false),
         slotSearchStatName(true, true),
@@ -95,8 +98,23 @@ public class PreemptorMetrics {
   }
 
   @VisibleForTesting
-  static String successStatName(boolean production) {
+  static String attemptsByJobStatName(IJobKey jobKey) {
+    return "preemption_slot_search_attempts_for_" + JobKeys.canonicalString(jobKey);
+  }
+
+  @VisibleForTesting
+  static String preemptedStatName(boolean production) {
     return "preemptor_tasks_preempted_" + prod(production);
+  }
+
+  @VisibleForTesting
+  static String preemptedByJobStatName(IJobKey jobKey) {
+    return "preemptor_tasks_preempted_" + JobKeys.canonicalString(jobKey);
+  }
+
+  @VisibleForTesting
+  static String preemptorByJobStatName(IJobKey jobKey) {
+    return "preemptor_task_preemptor_" + JobKeys.canonicalString(jobKey);
   }
 
   @VisibleForTesting
@@ -105,28 +123,46 @@ public class PreemptorMetrics {
   }
 
   @VisibleForTesting
+  static String slotSearchByJobStatName(boolean success, IJobKey jobKey) {
+    return "preemptor_slot_search_" + result(success) + "_for_" + JobKeys.canonicalString(jobKey);
+  }
+
+  @VisibleForTesting
   static String slotValidationStatName(boolean success) {
     return "preemptor_slot_validation_" + result(success);
   }
 
-  void recordPreemptionAttemptFor(ITaskConfig task) {
-    increment(attemptsStatName(task.isProduction()));
+  @VisibleForTesting
+  static String slotValidationByJobStatName(boolean success, IJobKey jobKey) {
+    return "preemptor_slot_validation_"
+        + result(success)
+        + "_for_"
+        + JobKeys.canonicalString(jobKey);
   }
 
-  void recordTaskPreemption(PreemptionVictim victim) {
-    increment(successStatName(victim.isProduction()));
+  void recordPreemptionAttemptFor(ITaskConfig task) {
+    increment(attemptsStatName(task.isProduction()));
+    increment(attemptsByJobStatName(task.getJob()));
+  }
+
+  void recordTaskPreemption(PreemptionVictim victim, IAssignedTask preemptor) {
+    increment(preemptedStatName(victim.isProduction()));
+    increment(preemptedByJobStatName(victim.getConfig().getJob()));
+    increment(preemptorByJobStatName(preemptor.getTask().getJob()));
   }
 
   void recordSlotSearchResult(Optional<?> result, ITaskConfig task) {
     increment(slotSearchStatName(result.isPresent(), task.isProduction()));
+    increment(slotSearchByJobStatName(result.isPresent(), task.getJob()));
   }
 
   void recordUnmatchedTask() {
     increment(UNMATCHED_TASKS);
   }
 
-  void recordSlotValidationResult(Optional<?> result) {
+  void recordSlotValidationResult(Optional<?> result, IAssignedTask task) {
     increment(slotValidationStatName(result.isPresent()));
+    increment(slotValidationByJobStatName(result.isPresent(), task.getTask().getJob()));
   }
 
   void recordMissingAttributes() {

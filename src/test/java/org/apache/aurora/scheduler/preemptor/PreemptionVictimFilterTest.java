@@ -174,7 +174,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   }
 
   @Test
-  public void testOnePreemptableTask() {
+  public void testOnePreemptibleTask() {
     setUpHost();
 
     schedulingFilter = createMock(SchedulingFilter.class);

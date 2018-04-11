@@ -128,8 +128,8 @@ public class TaskSchedulerImpl implements TaskScheduler {
         ));
 
     if (ids.size() != tasks.size()) {
-      LOG.warn("Failed to look up tasks "
-          + Joiner.on(", ").join(Sets.difference(ids, tasks.keySet())));
+      LOG.warn("Failed to look up tasks {}",
+          Joiner.on(", ").join(Sets.difference(ids, tasks.keySet())));
     }
     return tasks;
   }
@@ -179,13 +179,14 @@ public class TaskSchedulerImpl implements TaskScheduler {
       AttributeAggregate jobState,
       MutableStoreProvider storeProvider) {
 
-    if (!reservations.getByValue(TaskGroupKey.from(task.getTask())).isEmpty()) {
+    TaskGroupKey groupKey = TaskGroupKey.from(task.getTask());
+
+    if (!reservations.getByValue(groupKey).isEmpty()) {
       return;
     }
-    Optional<String> slaveId = preemptor.attemptPreemptionFor(task, jobState, storeProvider);
-    if (slaveId.isPresent()) {
-      reservations.put(slaveId.get(), TaskGroupKey.from(task.getTask()));
-    }
+
+    preemptor.attemptPreemptionFor(task, jobState, storeProvider)
+        .ifPresent(slaveId -> reservations.put(slaveId, groupKey));
   }
 
   @Subscribe
