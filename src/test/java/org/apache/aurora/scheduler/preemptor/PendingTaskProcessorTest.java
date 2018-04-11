@@ -224,8 +224,6 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     // evaluated first.
     assertTrue(ImmutableSet.of(0L, 2L).contains(
         statsProvider.getLongValue(slotSearchStatName(false, true))));
-    assertTrue(ImmutableSet.of(0L, 2L).contains(
-        statsProvider.getLongValue(slotSearchByJobStatName(false, JOB_A))));
     assertEquals(1L, statsProvider.getLongValue(UNMATCHED_TASKS));
     assertEquals(2L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
   }
