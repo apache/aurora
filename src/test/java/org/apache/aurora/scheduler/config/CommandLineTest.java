@@ -220,6 +220,7 @@ public class CommandLineTest {
     expected.preemptor.enablePreemptor = false;
     expected.preemptor.preemptionDelay = TEST_TIME;
     expected.preemptor.preemptionSlotHoldTime = TEST_TIME;
+    expected.preemptor.preemptionSlotSearchInitialDelay = TEST_TIME;
     expected.preemptor.preemptionSlotSearchInterval = TEST_TIME;
     expected.preemptor.reservationMaxBatchSize = 42;
     expected.preemptor.slotFinderModules = ImmutableList.of(NoopModule.class);
@@ -352,6 +353,7 @@ public class CommandLineTest {
         "-enable_preemptor=false",
         "-preemption_delay=42days",
         "-preemption_slot_hold_time=42days",
+        "-preemption_slot_search_initial_delay=42days",
         "-preemption_slot_search_interval=42days",
         "-preemption_reservation_max_batch_size=42",
         "-preemption_slot_finder_modules="
