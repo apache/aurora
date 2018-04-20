@@ -109,6 +109,9 @@ class SshCommand(Verb):
         CommandOption('--command', '-c', dest='command', type=str, default=None,
             metavar="unix_command_line",
             help="Command to execute through the ssh connection."),
+        CommandOption('--pid-file', '-p', dest='pid_file', type=str, default=None,
+            metavar="pid_file",
+            help="File in which to store the PID of the resulting ssh call")
     ]
 
   def execute(self, context):
@@ -154,7 +157,13 @@ class SshCommand(Verb):
           '-L', '%d:%s:%d' % (port, slave_host, assigned.assignedPorts[name])]
 
     ssh_command += ['%s@%s' % (context.options.ssh_user or role, slave_host), command]
-    return subprocess.call(ssh_command)
+    process = subprocess.Popen(ssh_command)
+
+    if context.options.pid_file:
+      with open(context.options.pid_file, "w") as f:
+        f.write(str(process.pid))
+
+    return process.wait()
 
 
 class ScpCommand(Verb):

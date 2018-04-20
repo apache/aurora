@@ -13,6 +13,7 @@
 #
 
 import contextlib
+import tempfile
 
 import pytest
 from mock import Mock, patch
@@ -110,6 +111,14 @@ class TestRunCommand(AuroraClientCommandTest):
 
 
 class TestSshCommand(AuroraClientCommandTest):
+  MOCKED_PID = 12312
+
+  @classmethod
+  def create_mock_process(cls):
+    process = Mock()
+    process.pid = cls.MOCKED_PID
+    process.wait.return_value = 0
+    return process
 
   @classmethod
   def create_status_response(cls):
@@ -128,6 +137,45 @@ class TestSshCommand(AuroraClientCommandTest):
   def create_failed_status_response(cls):
     return cls.create_blank_response(ResponseCode.INVALID_REQUEST, 'No tasks found for query')
 
+  def test_successful_ssh_with_pidfile(self):
+    """Test the ssh command with a saved PID file."""
+    with tempfile.NamedTemporaryFile() as pid_file:
+      (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+      mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
+      sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
+      with contextlib.nested(
+          patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+          patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+              return_value=sandbox_args),
+          patch('subprocess.Popen', return_value=self.create_mock_process())) as (
+              mock_scheduler_proxy_class,
+              mock_runner_args_patch,
+              mock_subprocess):
+        cmd = AuroraCommandLine()
+        cmd.execute([
+          'task',
+          'ssh',
+          '--pid-file={}'.format(pid_file.name),
+          '--ssh-options=-v',
+          'west/bozo/test/hello/1',
+          '--command=ls'
+        ])
+
+        # The status command sends a getTasksStatus query to the scheduler,
+        # and then prints the result.
+        mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(
+            jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
+            instanceIds=set([1]),
+            statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
+                ScheduleStatus.PREEMPTING, ScheduleStatus.PARTITIONED, ScheduleStatus.DRAINING])),
+            retry=True)
+        mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
+            'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
+            'slaverun/sandbox;ls'])
+
+        pid = pid_file.read()
+        assert(pid == str(self.MOCKED_PID))
+
   def test_successful_ssh(self):
     """Test the ssh command."""
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
@@ -137,7 +185,7 @@ class TestSshCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
-        patch('subprocess.call', return_value=0)) as (
+        patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,
             mock_runner_args_patch,
             mock_subprocess):
@@ -165,7 +213,7 @@ class TestSshCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
-        patch('subprocess.call', return_value=0)) as (
+        patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,
             mock_runner_args_patch,
             mock_subprocess):
@@ -190,7 +238,7 @@ class TestSshCommand(AuroraClientCommandTest):
     mock_scheduler_proxy.getTasksStatus.return_value = self.create_nojob_status_response()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('subprocess.call', return_value=0)) as (
+        patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,
             mock_subprocess):
       cmd = AuroraCommandLine()
@@ -204,7 +252,7 @@ class TestSshCommand(AuroraClientCommandTest):
     mock_scheduler_proxy.getTasksStatus.return_value = self.create_nojob_status_response()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('subprocess.call', return_value=0)) as (
+        patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,
             mock_subprocess):
       cmd = AuroraCommandLine()
