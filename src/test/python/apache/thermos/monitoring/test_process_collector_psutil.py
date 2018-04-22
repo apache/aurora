@@ -19,7 +19,7 @@ from apache.thermos.monitoring.process import ProcessSample
 from apache.thermos.monitoring.process_collector_psutil import ProcessTreeCollector
 
 
-@mock.patch('psutil.process_iter', autospec=True, spec_set=True)
+@mock.patch('psutil.Process.children', autospec=True, spec_set=True)
 def test_process_tree_collector(mock_process_iter):
   collector = ProcessTreeCollector(None)
   mock_process_iter.side_effect = psutil.Error
