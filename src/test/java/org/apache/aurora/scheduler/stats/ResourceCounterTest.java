@@ -131,6 +131,22 @@ public class ResourceCounterTest {
   }
 
   @Test
+  public void testComputeQuotaAllocationByRole() {
+    storage.write((NoResult.Quiet) storeProvider -> {
+      storeProvider.getQuotaStore().saveQuota("a", ResourceTestUtil.aggregate(1, 1, 1));
+      storeProvider.getQuotaStore().saveQuota("b", ResourceTestUtil.aggregate(2, 3, 4));
+    });
+
+    assertEquals(
+        ImmutableMap.of(
+            "a",
+            new Metric(TOTAL_CONSUMED, bag(1, 1, 1)),
+            "b",
+            new Metric(TOTAL_CONSUMED, bag(2, 3, 4))),
+        resourceCounter.computeQuotaAllocationByRole());
+  }
+
+  @Test
   public void testComputeAggregates() {
     insertTasks(
         task("bob", "jobA", "a",  1, GB, GB, PRODUCTION,    RUNNING,    NOT_DEDICATED),

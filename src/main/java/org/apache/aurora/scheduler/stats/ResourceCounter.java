@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
@@ -93,6 +94,23 @@ public class ResourceCounter {
       Metric allocation = new Metric();
       storeProvider.getQuotaStore().fetchQuotas().values().forEach(allocation::accumulate);
       return allocation;
+    });
+  }
+
+  /**
+   * Returns quota allocations by role (as metrics).
+   *
+   * @return A map of role to allocated quota metrics.
+   * @throws StorageException if there was a problem fetching quotas from storage.
+   */
+  public Map<String, Metric> computeQuotaAllocationByRole() throws StorageException {
+    return storage.read(storeProvider -> {
+      return storeProvider.getQuotaStore().fetchQuotas().entrySet().stream()
+          .collect(Collectors.toMap(e -> e.getKey(), e -> {
+            Metric allocation = new Metric();
+            allocation.accumulate(e.getValue());
+            return allocation;
+          }));
     });
   }
 

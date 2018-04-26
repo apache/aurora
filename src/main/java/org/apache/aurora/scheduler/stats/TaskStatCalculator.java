@@ -17,6 +17,8 @@ import javax.inject.Inject;
 
 import com.google.common.base.Joiner;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
@@ -49,13 +51,25 @@ class TaskStatCalculator implements Runnable {
     });
   }
 
+  @Timed("task_stat_calculator_run")
   @Override
   public void run() {
     try {
       for (Metric metric : resourceCounter.computeConsumptionTotals()) {
         update("resources_" + metric.type.name(), metric);
       }
+      // Export consumption per role
+      for (ResourceCounter.MetricType type: ResourceCounter.MetricType.values()) {
+        resourceCounter.computeAggregates(
+            Query.unscoped().active(),
+            type.filter,
+            (taskConfig) -> type.name() + "_" + taskConfig.getJob().getRole())
+            .forEach((name, metric) -> update("resources_per_role_" + name, metric));
+      }
+
       update("resources_allocated_quota", resourceCounter.computeQuotaAllocationTotals());
+      resourceCounter.computeQuotaAllocationByRole()
+          .forEach((role, metric) -> update("quota_per_role_" + role, metric));
     } catch (StorageException e) {
       LOG.debug("Unable to fetch metrics, storage is likely not ready.");
     }
