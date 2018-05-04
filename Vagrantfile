@@ -17,9 +17,7 @@
 # Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
 VAGRANTFILE_API_VERSION = "2"
 
-# 1.5.0 is required to use vagrant cloud images.
-# https://www.vagrantup.com/blog/vagrant-1-5-and-vagrant-cloud.html
-Vagrant.require_version ">= 1.5.0"
+Vagrant.require_version ">= 2.0.4"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.hostname = "aurora.local"
