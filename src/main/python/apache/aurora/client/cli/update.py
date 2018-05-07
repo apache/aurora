@@ -585,6 +585,11 @@ class UpdateInfo(Verb):
         "instance_update_events": []
       }
 
+      if details.update.summary.metadata is not None:
+        result["metadata"] = [{metadata.key: metadata.value} for metadata in sorted(
+            [update_metadata for update_metadata in details.update.summary.metadata],
+            key=lambda x: (x.key, x.value))]
+
       update_events = details.updateEvents
       if update_events is not None and len(update_events) > 0:
         for event in update_events:
@@ -632,6 +637,13 @@ class UpdateInfo(Verb):
             event.instanceId, format_timestamp(event.timestampMs),
             JobUpdateAction._VALUES_TO_NAMES[event.action]
           ), indent=2)
+      if details.update.summary.metadata is not None:
+        update_metadata = sorted(
+            [metadata for metadata in details.update.summary.metadata],
+            key=lambda x: (x.key, x.value))
+        context.print_out("Metadata:")
+        for metadata in update_metadata:
+          context.print_out("%s: %s" % (metadata.key, metadata.value), indent=2)
     return EXIT_OK
 
 

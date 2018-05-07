@@ -616,9 +616,13 @@ class TestUpdateInfo(AuroraClientCommandTest):
                 key=UPDATE_KEY,
                 user="me",
                 state=JobUpdateState(
-                  status=JobUpdateStatus.ROLLING_FORWARD,
-                  createdTimestampMs=1000,
-                  lastModifiedTimestampMs=2000))),
+                    status=JobUpdateStatus.ROLLING_FORWARD,
+                    createdTimestampMs=1000,
+                    lastModifiedTimestampMs=2000),
+                metadata={
+                    Metadata("issue", "test"),
+                    Metadata("country", "America"),
+                    Metadata("country", "Canada")})),
         updateEvents=[
             JobUpdateEvent(
                 status=JobUpdateStatus.ROLLING_FORWARD,
@@ -671,7 +675,11 @@ Instance events:
   Instance 1 at 1970-01-01T00:00:06: INSTANCE_UPDATING
   Instance 2 at 1970-01-01T00:00:07: INSTANCE_UPDATING
   Instance 1 at 1970-01-01T00:00:08: INSTANCE_UPDATED
-  Instance 2 at 1970-01-01T00:00:09: INSTANCE_UPDATED"""
+  Instance 2 at 1970-01-01T00:00:09: INSTANCE_UPDATED
+Metadata:
+  country: America
+  country: Canada
+  issue: test"""
 
   def test_update_info(self):
     self._mock_options.id = 'update_id'
@@ -734,6 +742,11 @@ Instance events:
                 "instance": 2,
                 "timestamp": 9000
             }
+        ],
+        "metadata": [
+            {"country": "America"},
+            {"country": "Canada"},
+            {"issue": "test"}
         ]
     }
 
