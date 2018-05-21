@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import javax.servlet.ServletException;
@@ -104,28 +103,24 @@ public class WebhookTest {
    */
   static class WebhookOnThrowableHandler<T> implements AsyncHandler<T> {
     private final AsyncHandler<T> handler;
-    private final CountDownLatch latch = new CountDownLatch(1);
+    private final CountDownLatch latch;
 
-    private boolean onThrowableFinished = false;
-
-    WebhookOnThrowableHandler(AsyncHandler<T> handler) {
+    WebhookOnThrowableHandler(AsyncHandler<T> handler, CountDownLatch latch) {
       this.handler = handler;
+      this.latch = latch;
     }
 
-    boolean hasOnThrowableFinished(long timeout, TimeUnit unit) {
+    void waitForOnThrowableToFinish() {
       try {
-        latch.await(timeout, unit);
+        latch.await();
       } catch (InterruptedException e) {
         // No-op
       }
-
-      return onThrowableFinished;
     }
 
     @Override
     public void onThrowable(Throwable t) {
       handler.onThrowable(t);
-      onThrowableFinished = true;
       latch.countDown();
     }
 
@@ -165,14 +160,16 @@ public class WebhookTest {
     public <T> ListenableFuture<T> executeRequest(org.asynchttpclient.Request request,
                                                   AsyncHandler<T> handler) {
 
-      WebhookOnThrowableHandler<T> wrapped = new WebhookOnThrowableHandler<>(handler);
+      WebhookOnThrowableHandler<T> wrapped = new WebhookOnThrowableHandler<>(
+          handler,
+          new CountDownLatch(1));
       ListenableFuture<T> future = super.executeRequest(request, wrapped);
       try {
         future.get();
         future.done();
       } catch (InterruptedException | ExecutionException e) {
-        // The future threw an exception, wait up to 60 seconds for onThrowable to complete.
-        wrapped.hasOnThrowableFinished(60, TimeUnit.SECONDS);
+        // The future threw an exception, wait for onThrowable to complete.
+        wrapped.waitForOnThrowableToFinish();
       }
       return future;
     }
@@ -241,8 +238,10 @@ public class WebhookTest {
 
   @Test
   public void testTaskChangedWithOldStateError() throws Exception {
-    // Don't start Jetty server, send the request to an invalid port to force a ConnectError
-    WebhookInfo webhookInfo = buildWebhookInfoWithJettyPort(WEBHOOK_INFO_BUILDER, -1);
+    // Don't start Jetty server, send the request to an invalid URL to force a UnknownHostException
+    WebhookInfo webhookInfo = buildWebhookInfo(
+        WEBHOOK_INFO_BUILDER,
+        "http://bad.host.com");
     Webhook webhook = new Webhook(httpClient, webhookInfo, statsProvider);
 
     webhook.taskChangedState(CHANGE_OLD_STATE);
@@ -417,11 +416,11 @@ public class WebhookTest {
    * should have been started before this method is called.
    */
   private WebhookInfo buildWebhookInfoWithJettyPort(WebhookInfoBuilder builder) {
-    return buildWebhookInfoWithJettyPort(builder, jettyServer.getURI().getPort());
+    String fullUrl = String.format("http://localhost:%d", jettyServer.getURI().getPort());
+    return buildWebhookInfo(builder, fullUrl);
   }
 
-  private WebhookInfo buildWebhookInfoWithJettyPort(WebhookInfoBuilder builder, int port) {
-    String fullUrl = String.format("http://localhost:%d", port);
+  private WebhookInfo buildWebhookInfo(WebhookInfoBuilder builder, String fullUrl) {
     return builder
         .setTargetURL(fullUrl)
         .build();
