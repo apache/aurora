@@ -172,6 +172,7 @@ public class RecoveryTest extends EasyMockTest {
 
     return new Snapshot()
         .setHostAttributes(ImmutableSet.of())
+        .setHostMaintenanceRequests(ImmutableSet.of())
         .setQuotaConfigurations(ImmutableSet.of())
         .setJobUpdateDetails(ImmutableSet.of())
         .setCronJobs(ImmutableSet.of())

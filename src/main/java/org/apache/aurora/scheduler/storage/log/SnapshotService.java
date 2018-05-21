@@ -77,7 +77,8 @@ class SnapshotService extends AbstractScheduledService implements SnapshotStore 
             + ", cron jobs: " + snapshot.getCronJobsSize()
             + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
             + ", tasks: " + snapshot.getTasksSize()
-            + ", updates: " + snapshot.getJobUpdateDetailsSize());
+            + ", updates: " + snapshot.getJobUpdateDetailsSize()
+            + ", host maintenance requests: " + snapshot.getHostMaintenanceRequestsSize());
       });
     } catch (CodingException e) {
       throw new StorageException("Failed to encode a snapshot", e);

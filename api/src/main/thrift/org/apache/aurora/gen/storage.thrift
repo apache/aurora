@@ -92,6 +92,14 @@ struct PruneJobUpdateHistory {
   2: i64 historyPruneThresholdMs
 }
 
+struct SaveHostMaintenanceRequest {
+  1: api.HostMaintenanceRequest hostMaintenanceRequest
+}
+
+struct RemoveHostMaintenanceRequest {
+  1: string host
+}
+
 union Op {
   1: SaveFrameworkId saveFrameworkId
   2: SaveCronJob saveCronJob
@@ -109,6 +117,8 @@ union Op {
   16: SaveJobInstanceUpdateEvent saveJobInstanceUpdateEvent
   17: PruneJobUpdateHistory pruneJobUpdateHistory
   18: RemoveJobUpdates removeJobUpdate
+  19: SaveHostMaintenanceRequest saveHostMaintenanceRequest
+  20: RemoveHostMaintenanceRequest removeHostMaintenanceRequest
 }
 
 // The current schema version ID.  This should be incremented each time the
@@ -152,6 +162,7 @@ struct Snapshot {
   10: set<StoredJobUpdateDetails> jobUpdateDetails
   //11: removed
   //12: removed
+  13: set<api.HostMaintenanceRequest> hostMaintenanceRequests
 }
 
 // A message header that calls out the number of expected FrameChunks to follow to form a complete

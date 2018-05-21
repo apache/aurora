@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -39,6 +38,7 @@ import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveHostMaintenanceRequest;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
@@ -53,6 +53,7 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Snapshotter;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -80,6 +81,7 @@ public class SnapshotterImpl implements Snapshotter {
   private static final String CRON_FIELD = "crons";
   private static final String JOB_UPDATE_FIELD = "job_updates";
   private static final String SCHEDULER_METADATA_FIELD = "scheduler_metadata";
+  private static final String HOST_MAINTENANCE_REQUESTS_FIELDS = "host_maintenance_requests";
 
   @VisibleForTesting
   Set<String> snapshotFieldNames() {
@@ -254,6 +256,29 @@ public class SnapshotterImpl implements Snapshotter {
 
                   return Streams.concat(parent, jobEvents, instanceEvents);
                 });
+          }
+          return Stream.empty();
+        }
+      },
+      new SnapshotField() {
+        @Override
+        String getName() {
+          return HOST_MAINTENANCE_REQUESTS_FIELDS;
+        }
+
+        @Override
+        void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
+          snapshot.setHostMaintenanceRequests(
+              IHostMaintenanceRequest.toBuildersSet(
+                  storeProvider.getHostMaintenanceStore().getHostMaintenanceRequests()));
+        }
+
+        @Override
+        Stream<Op> doStreamFrom(Snapshot snapshot) {
+          if (snapshot.getHostMaintenanceRequestsSize() > 0) {
+            return snapshot.getHostMaintenanceRequests().stream()
+                .map(request -> Op.saveHostMaintenanceRequest(
+                    new SaveHostMaintenanceRequest().setHostMaintenanceRequest(request)));
           }
           return Stream.empty();
         }

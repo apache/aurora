@@ -42,6 +42,7 @@ public interface Storage {
     QuotaStore getQuotaStore();
     AttributeStore getAttributeStore();
     JobUpdateStore getJobUpdateStore();
+    HostMaintenanceStore getHostMaintenanceStore();
   }
 
   /**
@@ -70,6 +71,7 @@ public interface Storage {
     QuotaStore.Mutable getQuotaStore();
     AttributeStore.Mutable getAttributeStore();
     JobUpdateStore.Mutable getJobUpdateStore();
+    HostMaintenanceStore.Mutable getHostMaintenanceStore();
   }
 
   /**

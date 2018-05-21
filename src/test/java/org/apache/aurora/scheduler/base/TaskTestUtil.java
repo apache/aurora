@@ -32,9 +32,11 @@ import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.PartitionPolicy;
+import org.apache.aurora.gen.PercentageSlaPolicy;
 import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskEvent;
@@ -113,15 +115,21 @@ public final class TaskTestUtil {
   }
 
   public static ITaskConfig makeConfig(IJobKey job) {
+    return makeConfig(job, true);
+  }
+
+  public static ITaskConfig makeConfig(IJobKey job, boolean prod) {
     return ITaskConfig.build(new TaskConfig()
         .setJob(job.newBuilder())
         .setOwner(new Identity().setUser(job.getRole() + "-user"))
         .setIsService(true)
         .setPriority(1)
         .setMaxTaskFailures(-1)
-        .setProduction(true)
+        .setProduction(prod)
         .setTier(PROD_TIER_NAME)
         .setPartitionPolicy(new PartitionPolicy().setDelaySecs(5).setReschedule(true))
+        .setSlaPolicy(SlaPolicy.percentageSlaPolicy(
+            new PercentageSlaPolicy().setPercentage(95.0).setDurationSecs(1800)))
         .setConstraints(ImmutableSet.of(
             new Constraint(
                 "valueConstraint",
@@ -157,6 +165,10 @@ public final class TaskTestUtil {
 
   public static IScheduledTask makeTask(String id, IJobKey job, int instanceId) {
     return makeTask(id, makeConfig(job), instanceId, Optional.empty());
+  }
+
+  public static IScheduledTask makeTask(String id, IJobKey job, int instanceId, boolean prod) {
+    return makeTask(id, makeConfig(job, prod), instanceId, Optional.empty());
   }
 
   public static IScheduledTask makeTask(String id, IJobKey job, int instanceId, String agentId) {

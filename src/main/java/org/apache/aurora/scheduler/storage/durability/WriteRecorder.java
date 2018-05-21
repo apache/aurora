@@ -24,12 +24,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.storage.Op;
+import org.apache.aurora.gen.storage.RemoveHostMaintenanceRequest;
 import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveHostMaintenanceRequest;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
@@ -40,6 +42,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
+import org.apache.aurora.scheduler.storage.HostMaintenanceStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -47,6 +50,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.durability.DurableStorage.TransactionManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -73,7 +77,8 @@ public class WriteRecorder implements
     TaskStore.Mutable,
     QuotaStore.Mutable,
     AttributeStore.Mutable,
-    JobUpdateStore.Mutable {
+    JobUpdateStore.Mutable,
+    HostMaintenanceStore.Mutable {
 
   private final TransactionManager transactionManager;
   private final SchedulerStore.Mutable schedulerStore;
@@ -82,6 +87,7 @@ public class WriteRecorder implements
   private final QuotaStore.Mutable quotaStore;
   private final AttributeStore.Mutable attributeStore;
   private final JobUpdateStore.Mutable jobUpdateStore;
+  private final HostMaintenanceStore.Mutable hostMaintenanceStore;
   private final Logger log;
   private final EventSink eventSink;
 
@@ -104,6 +110,7 @@ public class WriteRecorder implements
       QuotaStore.Mutable quotaStore,
       AttributeStore.Mutable attributeStore,
       JobUpdateStore.Mutable jobUpdateStore,
+      HostMaintenanceStore.Mutable hostMaintenanceStore,
       Logger log,
       EventSink eventSink) {
 
@@ -114,6 +121,7 @@ public class WriteRecorder implements
     this.quotaStore = requireNonNull(quotaStore);
     this.attributeStore = requireNonNull(attributeStore);
     this.jobUpdateStore = requireNonNull(jobUpdateStore);
+    this.hostMaintenanceStore = requireNonNull(hostMaintenanceStore);
     this.log = requireNonNull(log);
     this.eventSink = requireNonNull(eventSink);
   }
@@ -243,6 +251,24 @@ public class WriteRecorder implements
   }
 
   @Override
+  public void saveHostMaintenanceRequest(IHostMaintenanceRequest hostMaintenanceRequest) {
+    requireNonNull(hostMaintenanceRequest);
+
+    write(Op.saveHostMaintenanceRequest(
+        new SaveHostMaintenanceRequest(hostMaintenanceRequest.newBuilder())));
+    this.hostMaintenanceStore.saveHostMaintenanceRequest(hostMaintenanceRequest);
+  }
+
+  @Override
+  public void removeHostMaintenanceRequest(String host) {
+    requireNonNull(host);
+
+    write(Op.removeHostMaintenanceRequest(
+        new RemoveHostMaintenanceRequest(host)));
+    this.hostMaintenanceStore.removeHostMaintenanceRequest(host);
+  }
+
+  @Override
   public void deleteAllTasks() {
     throw new UnsupportedOperationException(
         "Unsupported since casual storage users should never be doing this.");
@@ -250,6 +276,12 @@ public class WriteRecorder implements
 
   @Override
   public void deleteHostAttributes() {
+    throw new UnsupportedOperationException(
+        "Unsupported since casual storage users should never be doing this.");
+  }
+
+  @Override
+  public void deleteHostMaintenanceRequests() {
     throw new UnsupportedOperationException(
         "Unsupported since casual storage users should never be doing this.");
   }
@@ -304,6 +336,11 @@ public class WriteRecorder implements
 
   @Override
   public JobUpdateStore.Mutable getJobUpdateStore() {
+    return this;
+  }
+
+  @Override
+  public HostMaintenanceStore.Mutable getHostMaintenanceStore() {
     return this;
   }
 
@@ -365,5 +402,15 @@ public class WriteRecorder implements
   @Override
   public Optional<IJobUpdateDetails> fetchJobUpdate(IJobUpdateKey key) {
     return this.jobUpdateStore.fetchJobUpdate(key);
+  }
+
+  @Override
+  public Optional<IHostMaintenanceRequest> getHostMaintenanceRequest(String host) {
+    return this.hostMaintenanceStore.getHostMaintenanceRequest(host);
+  }
+
+  @Override
+  public Set<IHostMaintenanceRequest> getHostMaintenanceRequests() {
+    return this.hostMaintenanceStore.getHostMaintenanceRequests();
   }
 }

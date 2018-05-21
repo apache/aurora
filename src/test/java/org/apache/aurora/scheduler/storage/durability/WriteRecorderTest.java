@@ -32,6 +32,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
+import org.apache.aurora.scheduler.storage.HostMaintenanceStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -64,6 +65,8 @@ public class WriteRecorderTest extends EasyMockTest {
     taskStore = createMock(TaskStore.Mutable.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
     jobUpdateStore = createMock(JobUpdateStore.Mutable.class);
+    HostMaintenanceStore.Mutable hostMaintenanceStore =
+        createMock(HostMaintenanceStore.Mutable.class);
     eventSink = createMock(EventSink.class);
 
     storage = new WriteRecorder(
@@ -74,6 +77,7 @@ public class WriteRecorderTest extends EasyMockTest {
         createMock(QuotaStore.Mutable.class),
         attributeStore,
         jobUpdateStore,
+        hostMaintenanceStore,
         LoggerFactory.getLogger(WriteRecorderTest.class),
         eventSink);
   }

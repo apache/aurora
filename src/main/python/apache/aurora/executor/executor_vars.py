@@ -62,7 +62,7 @@ class ExecutorVars(Observable, ExceptionalThread):
   def aggregate_memory(cls, process, attribute='pss'):
     try:
       return sum(getattr(mmap, attribute) for mmap in process.memory_maps())
-    except (psutil.Error, AttributeError):
+    except (OSError, psutil.Error, AttributeError):
       # psutil on OS X does not support get_memory_maps
       return 0
 

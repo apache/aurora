@@ -29,6 +29,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
+import org.apache.aurora.scheduler.storage.HostMaintenanceStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -76,6 +77,7 @@ public final class MemStorageModule extends PrivateModule {
     bindStore(QuotaStore.Mutable.class, MemQuotaStore.class);
     bindStore(SchedulerStore.Mutable.class, MemSchedulerStore.class);
     bindStore(JobUpdateStore.Mutable.class, MemJobUpdateStore.class);
+    bindStore(HostMaintenanceStore.Mutable.class, MemHostMaintenanceStore.class);
 
     Key<Storage> storageKey = keyFactory.create(Storage.class);
     bind(storageKey).to(MemStorage.class);

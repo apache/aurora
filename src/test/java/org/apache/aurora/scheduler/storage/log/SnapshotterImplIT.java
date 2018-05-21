@@ -25,6 +25,7 @@ import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.HostMaintenanceRequest;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobConfiguration;
@@ -41,7 +42,9 @@ import org.apache.aurora.gen.JobUpdateState;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.PercentageSlaPolicy;
 import org.apache.aurora.gen.Range;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -56,6 +59,7 @@ import org.apache.aurora.scheduler.storage.durability.Loader;
 import org.apache.aurora.scheduler.storage.durability.Persistence.Edit;
 import org.apache.aurora.scheduler.storage.durability.ThriftBackfill;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
@@ -156,6 +160,15 @@ public class SnapshotterImplIT {
           .setStatus(JobUpdateStatus.ERROR)))
       .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent()
           .setAction(JobUpdateAction.INSTANCE_UPDATED))));
+  private static final IHostMaintenanceRequest HOST_MAINTENANCE_REQUEST =
+      IHostMaintenanceRequest.build(
+          new HostMaintenanceRequest()
+              .setHost("host")
+              .setDefaultSlaPolicy(SlaPolicy.percentageSlaPolicy(
+                  new PercentageSlaPolicy()
+                      .setPercentage(95)
+                      .setDurationSecs(1800)))
+              .setTimeoutSecs(1800));
 
   private Snapshot expected() {
     return new Snapshot()
@@ -166,7 +179,8 @@ public class SnapshotterImplIT {
         .setCronJobs(ImmutableSet.of(new StoredCronJob(CRON_JOB.newBuilder())))
         .setSchedulerMetadata(new SchedulerMetadata(FRAMEWORK_ID, METADATA))
         .setJobUpdateDetails(ImmutableSet.of(
-            new StoredJobUpdateDetails().setDetails(UPDATE.newBuilder())));
+            new StoredJobUpdateDetails().setDetails(UPDATE.newBuilder())))
+        .setHostMaintenanceRequests(ImmutableSet.of(HOST_MAINTENANCE_REQUEST.newBuilder()));
   }
 
   private Snapshot makeNonBackfilled() {

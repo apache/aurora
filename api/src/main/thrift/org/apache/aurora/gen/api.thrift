@@ -245,6 +245,37 @@ struct PartitionPolicy {
   2: optional i64 delaySecs
 }
 
+/** SLA requirements expressed as the percentage of instances to be RUNNING every durationSecs */
+struct PercentageSlaPolicy {
+  /* The percentage of active instances required every `durationSecs`. */
+  1: double percentage
+  /** Minimum time duration a task needs to be `RUNNING` to be treated as active */
+  2: i64 durationSecs
+}
+
+/** SLA requirements expressed as the number of instances to be RUNNING every durationSecs */
+struct CountSlaPolicy {
+  /** The number of active instances required every `durationSecs` */
+  1: i64 count
+  /** Minimum time duration a task needs to be `RUNNING` to be treated as active */
+  2: i64 durationSecs
+}
+
+/** SLA requirements to be delegated to an external coordinator */
+struct CoordinatorSlaPolicy {
+  /** URL for the coordinator service that needs to be contacted for SLA checks */
+  1: string coordinatorUrl
+  /** Field in the Coordinator response json indicating if the action is allowed or not */
+  2: string statusKey
+}
+
+/** SLA requirements expressed in one of the many types */
+union SlaPolicy {
+  1: PercentageSlaPolicy percentageSlaPolicy
+  2: CountSlaPolicy countSlaPolicy
+  3: CoordinatorSlaPolicy coordinatorSlaPolicy
+}
+
 /** Description of the tasks contained within a job. */
 struct TaskConfig {
  /** Job task belongs to. */
@@ -279,6 +310,8 @@ struct TaskConfig {
  27: optional set<Metadata> metadata
  /** Policy for how to deal with task partitions */
  34: optional PartitionPolicy partitionPolicy
+ /** SLA requirements to be met during maintenance */
+ 35: optional SlaPolicy slaPolicy
 
  // This field is deliberately placed at the end to work around a bug in the immutable wrapper
  // code generator.  See AURORA-1185 for details.
@@ -865,6 +898,13 @@ struct JobUpdateQuery {
 
   /** Number or records to serve. Used by pagination. */
   7: i32 limit
+}
+
+struct HostMaintenanceRequest {
+  1: string host
+  2: SlaPolicy defaultSlaPolicy
+  3: i64 timeoutSecs
+  4: i64 createdTimestampMs
 }
 
 struct ListBackupsResult {

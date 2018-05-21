@@ -49,6 +49,7 @@ import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
+import org.apache.aurora.gen.storage.RemoveHostMaintenanceRequest;
 import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveJobUpdates;
 import org.apache.aurora.gen.storage.RemoveLock;
@@ -57,6 +58,7 @@ import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveHostMaintenanceRequest;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
@@ -111,6 +113,7 @@ public class DataCompatibilityTest {
    */
   private static final List<Op> READ_COMPATIBILITY_OPS = ImmutableList.of(
       Op.pruneJobUpdateHistory(newStruct(PruneJobUpdateHistory.class)),
+      Op.removeHostMaintenanceRequest(newStruct(RemoveHostMaintenanceRequest.class)),
       Op.removeJob(newStruct(RemoveJob.class)),
       Op.removeJobUpdate(newStruct(RemoveJobUpdates.class)),
       Op.removeLock(newStruct(RemoveLock.class)),
@@ -119,6 +122,7 @@ public class DataCompatibilityTest {
       Op.saveCronJob(newStruct(SaveCronJob.class)),
       Op.saveFrameworkId(newStruct(SaveFrameworkId.class)),
       Op.saveHostAttributes(newStruct(SaveHostAttributes.class)),
+      Op.saveHostMaintenanceRequest(newStruct(SaveHostMaintenanceRequest.class)),
       Op.saveJobUpdate(newStruct(SaveJobUpdate.class)),
       Op.saveJobInstanceUpdateEvent(newStruct(SaveJobInstanceUpdateEvent.class)),
       Op.saveJobUpdateEvent(newStruct(SaveJobUpdateEvent.class)),

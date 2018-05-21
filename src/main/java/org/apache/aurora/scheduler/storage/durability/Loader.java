@@ -23,6 +23,7 @@ import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.durability.Persistence.Edit;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
@@ -61,6 +62,7 @@ public final class Loader {
       stores.getQuotaStore().deleteQuotas();
       stores.getAttributeStore().deleteHostAttributes();
       stores.getJobUpdateStore().deleteAllUpdates();
+      stores.getHostMaintenanceStore().deleteHostMaintenanceRequests();
       return;
     }
 
@@ -141,6 +143,17 @@ public final class Loader {
       case REMOVE_JOB_UPDATE:
         stores.getJobUpdateStore().removeJobUpdates(
             IJobUpdateKey.setFromBuilders(op.getRemoveJobUpdate().getKeys()));
+        break;
+
+      case SAVE_HOST_MAINTENANCE_REQUEST:
+        stores.getHostMaintenanceStore().saveHostMaintenanceRequest(
+            IHostMaintenanceRequest
+                .build(op.getSaveHostMaintenanceRequest().getHostMaintenanceRequest()));
+        break;
+
+      case REMOVE_HOST_MAINTENANCE_REQUEST:
+        stores.getHostMaintenanceStore().removeHostMaintenanceRequest(
+            op.getRemoveHostMaintenanceRequest().getHost());
         break;
 
       default:

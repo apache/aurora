@@ -20,7 +20,10 @@ from twitter.common.lang import Compatibility
 
 from apache.aurora.config.schema.base import AppcImage as PystachioAppcImage
 from apache.aurora.config.schema.base import Container as PystachioContainer
+from apache.aurora.config.schema.base import CoordinatorSlaPolicy as PystachioCoordinatorSlaPolicy
+from apache.aurora.config.schema.base import CountSlaPolicy as PystachioCountSlaPolicy
 from apache.aurora.config.schema.base import DockerImage as PystachioDockerImage
+from apache.aurora.config.schema.base import PercentageSlaPolicy as PystachioPercentageSlaPolicy
 from apache.aurora.config.schema.base import (
     Docker,
     HealthCheckConfig,
@@ -35,6 +38,8 @@ from gen.apache.aurora.api.ttypes import (
     AppcImage,
     Constraint,
     Container,
+    CoordinatorSlaPolicy,
+    CountSlaPolicy,
     CronCollisionPolicy,
     DockerContainer,
     DockerImage,
@@ -49,7 +54,9 @@ from gen.apache.aurora.api.ttypes import (
     Metadata,
     Mode,
     PartitionPolicy,
+    PercentageSlaPolicy,
     Resource,
+    SlaPolicy,
     TaskConfig,
     TaskConstraint,
     ValueConstraint,
@@ -244,6 +251,37 @@ THERMOS_PORT_SCOPE_REF = Ref.from_address('thermos.ports')
 THERMOS_TASK_ID_REF = Ref.from_address('thermos.task_id')
 
 
+def create_sla_policy(sla_policy):
+  unwrapped = sla_policy.unwrap()
+  if isinstance(unwrapped, PystachioPercentageSlaPolicy):
+    return SlaPolicy(
+      percentageSlaPolicy=PercentageSlaPolicy(
+        fully_interpolated(unwrapped.percentage()),
+        fully_interpolated(unwrapped.duration_secs()),
+      ),
+      countSlaPolicy=None,
+      coordinatorSlaPolicy=None
+    )
+  elif isinstance(unwrapped, PystachioCountSlaPolicy):
+    return SlaPolicy(
+      percentageSlaPolicy=None,
+      countSlaPolicy=CountSlaPolicy(
+        fully_interpolated(unwrapped.count()),
+        fully_interpolated(unwrapped.duration_secs()),
+      ),
+      coordinatorSlaPolicy=None
+    )
+  elif isinstance(unwrapped, PystachioCoordinatorSlaPolicy):
+    return SlaPolicy(
+      percentageSlaPolicy=None,
+      countSlaPolicy=None,
+      coordinatorSlaPolicy=CoordinatorSlaPolicy(
+        fully_interpolated(unwrapped.coordinator_url()),
+        fully_interpolated(unwrapped.status_key()),
+      )
+    )
+
+
 def convert(job, metadata=frozenset(), ports=frozenset()):
   """Convert a Pystachio MesosJob to an Aurora Thrift JobConfiguration."""
 
@@ -273,6 +311,9 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
     task.partitionPolicy = PartitionPolicy(
       fully_interpolated(job.partition_policy().reschedule()),
       fully_interpolated(job.partition_policy().delay_secs()))
+
+  if job.has_sla_policy():
+    task.slaPolicy = create_sla_policy(job.sla_policy())
 
   # Add metadata to a task, to display in the scheduler UI.
   metadata_set = frozenset()

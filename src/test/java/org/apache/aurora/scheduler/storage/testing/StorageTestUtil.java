@@ -21,6 +21,7 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
+import org.apache.aurora.scheduler.storage.HostMaintenanceStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -52,6 +53,7 @@ public class StorageTestUtil {
   public final CronJobStore.Mutable jobStore;
   public final SchedulerStore.Mutable schedulerStore;
   public final JobUpdateStore.Mutable jobUpdateStore;
+  public final HostMaintenanceStore.Mutable hostMaintenanceStore;
   public final NonVolatileStorage storage;
 
   /**
@@ -68,6 +70,7 @@ public class StorageTestUtil {
     this.jobStore = easyMock.createMock(CronJobStore.Mutable.class);
     this.schedulerStore = easyMock.createMock(SchedulerStore.Mutable.class);
     this.jobUpdateStore = easyMock.createMock(JobUpdateStore.Mutable.class);
+    this.hostMaintenanceStore = easyMock.createMock(HostMaintenanceStore.Mutable.class);
     this.storage = easyMock.createMock(NonVolatileStorage.class);
   }
 
@@ -93,6 +96,7 @@ public class StorageTestUtil {
     expect(storeProvider.getCronJobStore()).andReturn(jobStore).anyTimes();
     expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expect(storeProvider.getJobUpdateStore()).andReturn(jobUpdateStore).anyTimes();
+    expect(storeProvider.getHostMaintenanceStore()).andReturn(hostMaintenanceStore).anyTimes();
     expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getUnsafeTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
@@ -100,6 +104,8 @@ public class StorageTestUtil {
     expect(mutableStoreProvider.getCronJobStore()).andReturn(jobStore).anyTimes();
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expect(mutableStoreProvider.getJobUpdateStore()).andReturn(jobUpdateStore).anyTimes();
+    expect(
+        mutableStoreProvider.getHostMaintenanceStore()).andReturn(hostMaintenanceStore).anyTimes();
   }
 
   /**

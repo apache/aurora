@@ -25,6 +25,7 @@ import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
+import org.apache.aurora.scheduler.storage.HostMaintenanceStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -106,6 +107,7 @@ public class DurableStorage implements NonVolatileStorage {
       @Volatile QuotaStore.Mutable quotaStore,
       @Volatile AttributeStore.Mutable attributeStore,
       @Volatile JobUpdateStore.Mutable jobUpdateStore,
+      @Volatile HostMaintenanceStore.Mutable hostMaintenanceStore,
       EventSink eventSink,
       ReentrantLock writeLock,
       ThriftBackfill thriftBackfill) {
@@ -137,6 +139,7 @@ public class DurableStorage implements NonVolatileStorage {
         quotaStore,
         attributeStore,
         jobUpdateStore,
+        hostMaintenanceStore,
         LoggerFactory.getLogger(WriteRecorder.class),
         eventSink);
   }

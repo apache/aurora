@@ -18,6 +18,7 @@ import javax.inject.Inject;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
+import org.apache.aurora.scheduler.storage.HostMaintenanceStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -37,7 +38,8 @@ public class MemStorage implements Storage {
       @Volatile final TaskStore.Mutable taskStore,
       @Volatile final QuotaStore.Mutable quotaStore,
       @Volatile final AttributeStore.Mutable attributeStore,
-      @Volatile final JobUpdateStore.Mutable updateStore) {
+      @Volatile final JobUpdateStore.Mutable updateStore,
+      @Volatile final HostMaintenanceStore.Mutable hostMaintenanceStore) {
 
     storeProvider = new MutableStoreProvider() {
       @Override
@@ -73,6 +75,11 @@ public class MemStorage implements Storage {
       @Override
       public JobUpdateStore.Mutable getJobUpdateStore() {
         return updateStore;
+      }
+
+      @Override
+      public HostMaintenanceStore.Mutable getHostMaintenanceStore() {
+        return hostMaintenanceStore;
       }
     };
   }

@@ -22,9 +22,9 @@ from apache.aurora.config import AuroraConfig
 from apache.aurora.config.schema.base import Job
 from apache.thermos.config.schema_base import MB, Process, Resources, Task
 
-from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
-
 from .util import AuroraClientCommandTest
+
+from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
 
 
 class TestInspectCommand(AuroraClientCommandTest):

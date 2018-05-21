@@ -29,6 +29,7 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.HostMaintenanceRequest;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
@@ -41,13 +42,16 @@ import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.PercentageSlaPolicy;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
+import org.apache.aurora.gen.storage.RemoveHostMaintenanceRequest;
 import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveJobUpdates;
 import org.apache.aurora.gen.storage.RemoveLock;
@@ -56,6 +60,7 @@ import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveHostMaintenanceRequest;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
@@ -75,6 +80,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.durability.Persistence.Edit;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -129,6 +135,7 @@ public class DurableStorageTest extends EasyMockTest {
         storageUtil.quotaStore,
         storageUtil.attributeStore,
         storageUtil.jobUpdateStore,
+        storageUtil.hostMaintenanceStore,
         eventSink,
         new ReentrantLock(),
         TaskTestUtil.THRIFT_BACKFILL);
@@ -207,6 +214,7 @@ public class DurableStorageTest extends EasyMockTest {
     storageUtil.quotaStore.deleteQuotas();
     storageUtil.attributeStore.deleteHostAttributes();
     storageUtil.jobUpdateStore.deleteAllUpdates();
+    storageUtil.hostMaintenanceStore.deleteHostMaintenanceRequests();
 
     RemoveTasks removeTasks = new RemoveTasks(ImmutableSet.of("taskId1"));
     builder.add(Edit.op(Op.removeTasks(removeTasks)));
@@ -780,6 +788,55 @@ public class DurableStorageTest extends EasyMockTest {
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
         storeProvider.getJobUpdateStore().removeJobUpdates(ImmutableSet.of(key));
+      }
+    }.run();
+  }
+
+  @Test
+  public void testSaveHostMaintenanceRequest() throws Exception {
+    String host = "hostname";
+    IHostMaintenanceRequest hostMaintenanceRequest  = IHostMaintenanceRequest.build(
+        new HostMaintenanceRequest()
+          .setHost(host)
+          .setDefaultSlaPolicy(SlaPolicy.percentageSlaPolicy(
+              new PercentageSlaPolicy()
+                .setPercentage(95)
+                .setDurationSecs(1800)))
+          .setTimeoutSecs(1800)
+    );
+
+    new AbstractMutationFixture() {
+      @Override
+      protected void setupExpectations() {
+        storageUtil.expectWrite();
+        storageUtil.hostMaintenanceStore.saveHostMaintenanceRequest(hostMaintenanceRequest);
+        expectPersist(Op.saveHostMaintenanceRequest(
+            new SaveHostMaintenanceRequest(hostMaintenanceRequest.newBuilder())));
+      }
+
+      @Override
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getHostMaintenanceStore().saveHostMaintenanceRequest(
+            hostMaintenanceRequest);
+      }
+    }.run();
+  }
+
+  @Test
+  public void testRemoveHostMaintenanceRequest() throws Exception {
+    String host = "hostname";
+
+    new AbstractMutationFixture() {
+      @Override
+      protected void setupExpectations() {
+        storageUtil.expectWrite();
+        storageUtil.hostMaintenanceStore.removeHostMaintenanceRequest(host);
+        expectPersist(Op.removeHostMaintenanceRequest(new RemoveHostMaintenanceRequest(host)));
+      }
+
+      @Override
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getHostMaintenanceStore().removeHostMaintenanceRequest(host);
       }
     }.run();
   }
