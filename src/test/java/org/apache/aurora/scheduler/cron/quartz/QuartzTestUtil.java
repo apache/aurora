@@ -37,7 +37,7 @@ final class QuartzTestUtil {
   static final IJobConfiguration JOB = IJobConfiguration.build(
       new JobConfiguration()
           .setCronSchedule("* * * * SUN")
-          .setInstanceCount(10)
+          .setInstanceCount(20)
           .setOwner(new Identity().setUser("user"))
           .setKey(AURORA_JOB_KEY.newBuilder())
           .setTaskConfig(TaskTestUtil.makeConfig(AURORA_JOB_KEY)

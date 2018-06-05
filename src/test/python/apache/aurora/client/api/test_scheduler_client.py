@@ -45,6 +45,7 @@ from gen.apache.aurora.api.ttypes import (
     ResponseCode,
     ResponseDetail,
     ScheduleStatus,
+    SlaPolicy,
     TaskQuery
 )
 
@@ -210,6 +211,14 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mock_thrift_client.drainHosts(IsA(Hosts)).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().drainHosts(Hosts())
+
+  def test_slaDrainHosts(self):
+    self.mock_thrift_client.slaDrainHosts(
+      IsA(Hosts),
+      IsA(SlaPolicy),
+      10).AndReturn(DEFAULT_RESPONSE)
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().slaDrainHosts(Hosts(), SlaPolicy(), 10)
 
   def test_maintenanceStatus(self):
     self.mock_thrift_client.maintenanceStatus(

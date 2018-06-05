@@ -20,7 +20,8 @@ from apache.aurora.client.cli.options import TaskInstanceKey
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
-from gen.apache.aurora.api.ttypes import ScheduleStatus
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import ScheduleStatus, TaskQuery
 
 
 class TestAddCommand(AuroraClientCommandTest):
@@ -37,6 +38,8 @@ class TestAddCommand(AuroraClientCommandTest):
     self._mock_options.open_browser = True
     self._fake_context.add_expected_query_result(self.create_query_call_result(
         self.create_scheduled_task(1, ScheduleStatus.RUNNING)))
+    self._fake_context.add_expected_query_result(
+      self.create_query_call_result(), job_key=self.TEST_JOBKEY)
 
     self._mock_api.add_instances.return_value = self.create_simple_success_response()
 
@@ -50,11 +53,17 @@ class TestAddCommand(AuroraClientCommandTest):
     assert mock_webbrowser.mock_calls == [
         call("http://something_or_other/scheduler/bozo/test/hello")
     ]
+    assert self._mock_api.query_no_configs.mock_calls == [
+      call(TaskQuery(jobKeys=[self.TEST_JOBKEY.to_thrift()], statuses=ACTIVE_STATES)),
+      call(TaskQuery(jobKeys=[self.TEST_JOBKEY.to_thrift()], statuses=ACTIVE_STATES))
+    ]
 
   def test_wait_added_instances(self):
     self._mock_options.wait_until = 'RUNNING'
     self._fake_context.add_expected_query_result(self.create_query_call_result(
         self.create_scheduled_task(1, ScheduleStatus.PENDING)))
+    self._fake_context.add_expected_query_result(
+      self.create_query_call_result(), job_key=self.TEST_JOBKEY)
 
     self._mock_api.add_instances.return_value = self.create_simple_success_response()
 
@@ -70,6 +79,10 @@ class TestAddCommand(AuroraClientCommandTest):
         self.TEST_JOBKEY,
         self._mock_api,
         [2, 3, 4])]
+    assert self._mock_api.query_no_configs.mock_calls == [
+      call(TaskQuery(jobKeys=[self.TEST_JOBKEY.to_thrift()], statuses=ACTIVE_STATES)),
+      call(TaskQuery(jobKeys=[self.TEST_JOBKEY.to_thrift()], statuses=ACTIVE_STATES))
+    ]
 
   def test_no_active_instance(self):
     self._fake_context.add_expected_query_result(self.create_empty_task_result())
@@ -79,8 +92,15 @@ class TestAddCommand(AuroraClientCommandTest):
   def test_add_instances_raises(self):
     self._fake_context.add_expected_query_result(self.create_query_call_result(
         self.create_scheduled_task(1, ScheduleStatus.PENDING)))
+    self._fake_context.add_expected_query_result(
+      self.create_query_call_result(), job_key=self.TEST_JOBKEY)
 
     self._mock_api.add_instances.return_value = self.create_error_response()
 
     with pytest.raises(Context.CommandError):
       self._command.execute(self._fake_context)
+
+    assert self._mock_api.query_no_configs.mock_calls == [
+      call(TaskQuery(jobKeys=[self.TEST_JOBKEY.to_thrift()], statuses=ACTIVE_STATES)),
+      call(TaskQuery(jobKeys=[self.TEST_JOBKEY.to_thrift()], statuses=ACTIVE_STATES))
+    ]

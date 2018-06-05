@@ -28,6 +28,7 @@ Description of important Aurora features.
  * [Services](features/services.md)
  * [Service Discovery](features/service-discovery.md)
  * [SLA Metrics](features/sla-metrics.md)
+ * [SLA Requirements](features/sla-requirements.md)
  * [Webhooks](features/webhooks.md)
 
 ## Operators

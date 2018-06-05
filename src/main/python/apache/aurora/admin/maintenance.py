@@ -18,13 +18,17 @@ from apache.aurora.client.base import GROUPING_OPTION, get_grouping_or_die, requ
 from apache.aurora.common.clusters import CLUSTERS
 
 from .admin_util import (
+    DEFAULT_SLA_DURATION_OPTION,
+    DEFAULT_SLA_PERCENTAGE_OPTION,
     FILENAME_OPTION,
+    FORCE_DRAIN_TIMEOUT_OPTION,
     HOSTS_OPTION,
     OVERRIDE_SLA_DURATION_OPTION,
     OVERRIDE_SLA_PERCENTAGE_OPTION,
     OVERRIDE_SLA_REASON_OPTION,
     POST_DRAIN_SCRIPT_OPTION,
     UNSAFE_SLA_HOSTS_FILE_OPTION,
+    parse_and_validate_sla_drain_default,
     parse_and_validate_sla_overrides,
     parse_hostnames,
     parse_script
@@ -129,6 +133,47 @@ def host_drain(cluster):
           duration=override_duration,
           output_file=options.unsafe_hosts_filename,
           callback=post_drain_callback)
+
+
+@app.command
+@app.command_option(FORCE_DRAIN_TIMEOUT_OPTION)
+@app.command_option(FILENAME_OPTION)
+@app.command_option(HOSTS_OPTION)
+@app.command_option(DEFAULT_SLA_PERCENTAGE_OPTION)
+@app.command_option(DEFAULT_SLA_DURATION_OPTION)
+@requires.exactly('cluster')
+def sla_host_drain(cluster):
+  """usage: sla_host_drain {--filename=filename | --hosts=hosts}
+                           [--default_percentage=percentage]
+                           [--default_duration=duration]
+                           [--force_drain_timeout=timeout]
+                           cluster
+
+  Asks the scheduler to drain the list of provided hosts in an SLA-aware manner.
+
+  The list of hosts is drained and marked in a drained state.  This will kill
+  off any tasks currently running on these hosts, as well as prevent future
+  tasks from scheduling on these hosts while they are drained.
+
+  The hosts are left in maintenance mode upon completion. Use host_activate to
+  return hosts back to service and allow scheduling tasks on them.
+
+  If tasks are unable to be drained after the specified timeout interval they will
+  be forcefully drained even if it breaks SLA.
+  """
+  options = app.get_options()
+  drainable_hosts = parse_hostnames(options.filename, options.hosts)
+
+  percentage, duration, timeout = parse_and_validate_sla_drain_default(options)
+
+  HostMaintenance(
+      cluster=CLUSTERS[cluster],
+      verbosity=options.verbosity,
+      bypass_leader_redirect=options.bypass_leader_redirect).perform_sla_maintenance(
+          drainable_hosts,
+          percentage=percentage,
+          duration=duration,
+          timeout=timeout)
 
 
 @app.command

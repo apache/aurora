@@ -35,6 +35,7 @@ import org.apache.aurora.scheduler.http.api.security.HttpSecurityModule;
 import org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule;
 import org.apache.aurora.scheduler.http.api.security.Kerberos5ShiroRealmModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
+import org.apache.aurora.scheduler.maintenance.MaintenanceModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
 import org.apache.aurora.scheduler.offers.OfferManagerModule;
 import org.apache.aurora.scheduler.preemptor.PreemptorModule;
@@ -86,6 +87,7 @@ public class CliOptions {
   public final StatsModule.Options stats = new StatsModule.Options();
   public final CronModule.Options cron = new CronModule.Options();
   public final ResourceSettings resourceSettings = new ResourceSettings();
+  public final MaintenanceModule.Options maintenance = new MaintenanceModule.Options();
   final List<Object> custom;
 
   public CliOptions() {

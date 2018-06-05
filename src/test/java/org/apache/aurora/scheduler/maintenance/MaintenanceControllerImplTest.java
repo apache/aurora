@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.state;
+package org.apache.aurora.scheduler.maintenance;
 
 import java.util.Optional;
 import java.util.Set;
@@ -22,28 +22,37 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.gen.CountSlaPolicy;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.HostMaintenanceRequest;
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.MaintenanceMode;
-import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.PercentageSlaPolicy;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.sla.SlaManager;
+import org.apache.aurora.scheduler.state.PubsubTestUtil;
+import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 import org.apache.aurora.scheduler.storage.entities.IHostStatus;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ISlaPolicy;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.v1.Protos;
@@ -56,8 +65,9 @@ import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import static org.apache.aurora.scheduler.testing.BatchWorkerUtil.expectBatchExecute;
+import static org.easymock.EasyMock.anyObject;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
@@ -84,6 +94,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
       .setStart(Protos.TimeInfo.newBuilder()
           .setNanoseconds(Amount.of(1L, Time.MINUTES).as(Time.NANOSECONDS)))
       .build();
+  private static final SlaPolicy SLA_POLICY = SlaPolicy.percentageSlaPolicy(
+      new PercentageSlaPolicy(95, 1800));
 
   private static final Protos.InverseOffer INVERSE_OFFER = Protos.InverseOffer.newBuilder()
       .setId(OFFER_ID)
@@ -93,9 +105,16 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
       .setUnavailability(UNAVAILABILITY)
       .build();
 
+  private static final SlaPolicy COUNT_SLA_POLICY = SlaPolicy.countSlaPolicy(
+      new CountSlaPolicy()
+          .setCount(2)
+          .setDurationSecs(1800)
+  );
+
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
-  private MaintenanceController maintenance;
+  private SlaManager slaManager;
+  private MaintenanceController.MaintenanceControllerImpl maintenance;
   private EventSink eventSink;
 
   @Before
@@ -103,24 +122,30 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
+    slaManager = createMock(SlaManager.class);
     TaskEventBatchWorker batchWorker = createMock(TaskEventBatchWorker.class);
     expectBatchExecute(batchWorker, storageUtil.storage, control).anyTimes();
 
     Injector injector = Guice.createInjector(
         new PubsubEventModule(),
+        new MaintenanceModule(new MaintenanceModule.Options()),
         new AbstractModule() {
           @Override
           protected void configure() {
-            StateModule.bindMaintenanceController(binder());
             bind(Storage.class).toInstance(storageUtil.storage);
             bind(StateManager.class).toInstance(stateManager);
+            bind(SlaManager.class).toInstance(slaManager);
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Executor.class).annotatedWith(AsyncExecutor.class)
                 .toInstance(MoreExecutors.directExecutor());
             bind(TaskEventBatchWorker.class).toInstance(batchWorker);
+            bind(new TypeLiteral<Amount<Long, Time>>() { })
+                .annotatedWith(
+                    MaintenanceController.MaintenanceControllerImpl.PollingInterval.class)
+                .toInstance(new TimeAmount(1, Time.MINUTES));
           }
         });
-    maintenance = injector.getInstance(MaintenanceController.class);
+    maintenance = injector.getInstance(MaintenanceController.MaintenanceControllerImpl.class);
     eventSink = PubsubTestUtil.startPubsub(injector);
   }
 
@@ -145,9 +170,18 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expectMaintenanceModeChange(HOST_A, DRAINING);
     IHostAttributes attributes =
         IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
+    IHostMaintenanceRequest maintenanceRequest =
+        IHostMaintenanceRequest.build(new HostMaintenanceRequest()
+            .setHost(HOST_A)
+            .setCreatedTimestampMs(System.currentTimeMillis())
+            .setDefaultSlaPolicy(SLA_POLICY));
 
+    storageUtil.hostMaintenanceStore.saveHostMaintenanceRequest(
+        anyObject(IHostMaintenanceRequest.class));
     expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
         .andReturn(Optional.of(attributes)).times(2);
+    expect(storageUtil.hostMaintenanceStore.getHostMaintenanceRequest(HOST_A))
+        .andReturn(Optional.of(maintenanceRequest)).times(2);
 
     expect(storageUtil.attributeStore.getHostAttributes()).andReturn(ImmutableSet.of(attributes));
     expectFetchTasksByHost(HOST_A, ImmutableSet.of(task2));
@@ -155,6 +189,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expectFetchTasksByHost(HOST_A, ImmutableSet.of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
     expectMaintenanceModeChange(HOST_A, NONE);
+    storageUtil.hostMaintenanceStore.removeHostMaintenanceRequest(HOST_A);
 
     control.replay();
 
@@ -183,6 +218,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testDrainEmptyHost() {
+    storageUtil.hostMaintenanceStore.saveHostMaintenanceRequest(
+        anyObject(IHostMaintenanceRequest.class));
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
     expectFetchTasksByHost(HOST_A, ImmutableSet.of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
@@ -199,6 +236,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expectMaintenanceModeChange(HOST_A, NONE);
     expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.of(
         IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(NONE))));
+    storageUtil.hostMaintenanceStore.removeHostMaintenanceRequest(HOST_A);
 
     control.replay();
 
@@ -211,6 +249,115 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     // from stale internal state.
     eventSink.post(TaskStateChange.transition(
         IScheduledTask.build(makeTask(HOST_A, "taskA").newBuilder().setStatus(KILLED)), RUNNING));
+  }
+
+  @Test
+  public void testSlaDrain() {
+    storageUtil.hostMaintenanceStore.saveHostMaintenanceRequest(
+        anyObject(IHostMaintenanceRequest.class));
+    expectMaintenanceModeChange(HOST_A, DRAINING);
+
+    control.replay();
+
+    assertStatus(
+        HOST_A,
+        DRAINING,
+        maintenance.slaDrain(ImmutableSet.of(HOST_A), COUNT_SLA_POLICY, 1800));
+  }
+
+  @Test
+  public void testSlaDrainUnknownHost() {
+    storageUtil.hostMaintenanceStore.saveHostMaintenanceRequest(
+        anyObject(IHostMaintenanceRequest.class));
+    expect(storageUtil.attributeStore.getHostAttributes("unknown"))
+        .andReturn(Optional.empty());
+
+    control.replay();
+
+    assertEquals(ImmutableSet.of(),
+        maintenance.slaDrain(ImmutableSet.of("unknown"), COUNT_SLA_POLICY, 1800));
+  }
+
+  @Test
+  public void testIteration() {
+    IScheduledTask task1 = makeTask(HOST_A, "taskA");
+    IScheduledTask task2 = makeTask(HOST_A, "taskB");
+
+    IHostAttributes attributes =
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
+    expect(storageUtil.attributeStore.getHostAttributes())
+        .andReturn(ImmutableSet.of(attributes));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(task1, task2));
+    IHostMaintenanceRequest maintenanceRequest =
+        IHostMaintenanceRequest.build(new HostMaintenanceRequest()
+            .setHost(HOST_A)
+            .setCreatedTimestampMs(System.currentTimeMillis())
+            .setDefaultSlaPolicy(SLA_POLICY));
+    expect(storageUtil.hostMaintenanceStore.getHostMaintenanceRequest(HOST_A))
+        .andReturn(Optional.of(maintenanceRequest)).times(2);
+    expectTaskDraining(task1);
+    expectTaskDraining(task2);
+
+    control.replay();
+
+    maintenance.runForTest();
+  }
+
+  @Test
+  public void testIterationEmptyHost() {
+    IHostAttributes attributes =
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
+    expect(storageUtil.attributeStore.getHostAttributes())
+        .andReturn(ImmutableSet.of(attributes));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of());
+    expectMaintenanceModeChange(HOST_A, DRAINED);
+
+    control.replay();
+
+    maintenance.runForTest();
+  }
+
+  @Test
+  public void testIterationMaintenanceTimeout() {
+    IScheduledTask task1 = makeTask(HOST_A, "taskA");
+    IScheduledTask task2 = makeTask(HOST_A, "taskB");
+
+    IHostAttributes attributes =
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
+    expect(storageUtil.attributeStore.getHostAttributes())
+        .andReturn(ImmutableSet.of(attributes));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(task1, task2));
+    IHostMaintenanceRequest maintenanceRequest =
+        IHostMaintenanceRequest.build(new HostMaintenanceRequest()
+            .setHost(HOST_A)
+            .setCreatedTimestampMs(0)
+            .setDefaultSlaPolicy(SLA_POLICY));
+    expect(storageUtil.hostMaintenanceStore.getHostMaintenanceRequest(HOST_A))
+        .andReturn(Optional.of(maintenanceRequest)).times(2);
+    expectTaskDraining(task1, true);
+    expectTaskDraining(task2, true);
+
+    control.replay();
+
+    maintenance.runForTest();
+  }
+
+  @Test
+  public void testIterationNoMaintenanceRequest() {
+    IScheduledTask task1 = makeTask(HOST_A, "taskA");
+    IScheduledTask task2 = makeTask(HOST_A, "taskB");
+
+    IHostAttributes attributes =
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
+    expect(storageUtil.attributeStore.getHostAttributes())
+        .andReturn(ImmutableSet.of(attributes));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(task1, task2));
+    expect(storageUtil.hostMaintenanceStore.getHostMaintenanceRequest(HOST_A))
+        .andReturn(Optional.empty()).times(2);
+
+    control.replay();
+
+    maintenance.runForTest();
   }
 
   @Test
@@ -228,21 +375,32 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   @Test
   public void testInverseOfferDrain() {
     IScheduledTask task1 = makeTask(HOST_A, "taskA");
+    storageUtil.hostMaintenanceStore.saveHostMaintenanceRequest(
+        anyObject(IHostMaintenanceRequest.class));
     expectFetchTasksByHost(HOST_A, ImmutableSet.of(task1));
     expectTaskDraining(task1);
+    IHostMaintenanceRequest maintenanceRequest =
+        IHostMaintenanceRequest.build(new HostMaintenanceRequest()
+            .setHost(HOST_A)
+            .setCreatedTimestampMs(System.currentTimeMillis())
+            .setDefaultSlaPolicy(SLA_POLICY));
+    expect(storageUtil.hostMaintenanceStore.getHostMaintenanceRequest(HOST_A))
+        .andReturn(Optional.of(maintenanceRequest)).times(1);
 
     control.replay();
     maintenance.drainForInverseOffer(INVERSE_OFFER);
   }
 
   private void expectTaskDraining(IScheduledTask task) {
-    expect(stateManager.changeState(
-        storageUtil.mutableStoreProvider,
-        Tasks.id(task),
-        Optional.empty(),
-        ScheduleStatus.DRAINING,
-        MaintenanceControllerImpl.DRAINING_MESSAGE))
-        .andReturn(StateChangeResult.SUCCESS);
+    expectTaskDraining(task, false);
+  }
+
+  private void expectTaskDraining(IScheduledTask task, boolean force) {
+    slaManager.checkSlaThenAct(
+        eq(task),
+        eq(ISlaPolicy.build(SLA_POLICY)),
+        anyObject(Storage.MutateWork.class),
+        eq(force));
   }
 
   private void expectFetchTasksByHost(String hostName, Set<IScheduledTask> tasks) {

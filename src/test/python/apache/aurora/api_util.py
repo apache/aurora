@@ -58,6 +58,9 @@ class SchedulerThriftApiSpec(ReadOnlyScheduler.Iface):
   def drainHosts(self, hosts):
     pass
 
+  def slaDrainHosts(self, hosts, defaultSlaPolicy, timeoutSecs):
+    pass
+
   def maintenanceStatus(self, hosts):
     pass
 

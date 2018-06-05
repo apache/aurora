@@ -14,7 +14,6 @@
 from __future__ import print_function
 
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-from SocketServer import ThreadingMixIn
 from sys import argv
 from threading import Thread
 
@@ -40,6 +39,7 @@ def start_server(port, handler_class):
   server = HTTPServer(('', port), handler_class)
   print('Listening on port %s' % port)
   server.serve_forever()
+
 
 request_thread = Thread(target=start_server, args=[int(argv[1]), RequestHandler])
 health_thread = Thread(target=start_server, args=[int(argv[2]), HealthHandler])

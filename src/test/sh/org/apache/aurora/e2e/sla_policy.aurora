@@ -1,0 +1,61 @@
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+hello = Process(
+  name = 'hello',
+  cmdline = """
+    while true; do
+      echo hello world
+      sleep 10
+    done
+  """)
+
+copy_coordinator = Process(
+  name = 'copy_coordinator',
+  cmdline = 'cp /vagrant/src/test/sh/org/apache/aurora/e2e/sla_coordinator.py .'
+)
+
+run_coordinator = Process(
+  name = 'run_coordinator',
+  cmdline = 'python sla_coordinator.py {{mesos.instance}}')
+
+task = SequentialTask(
+  processes = [hello],
+  resources = Resources(cpu = 0.1, ram = 1*MB, disk = 8*MB))
+
+coordinator_task = SequentialTask(
+  processes = [copy_coordinator, run_coordinator],
+  resources = Resources(cpu = 0.1, ram = 1*MB, disk = 8*MB))
+
+service = Service(
+  task = task,
+  tier = 'preferred',
+  instances = 2,
+  cluster = 'devcluster',
+  role = 'vagrant',
+  environment = 'test')
+
+coordinator_service = Service(
+  task = coordinator_task,
+  tier = 'preferred',
+  instances = 2,
+  cluster = 'devcluster',
+  role = 'vagrant',
+  environment = 'test')
+
+jobs = [
+  service(name = 'count', sla_policy=CountSlaPolicy(count=1, duration_secs=60)),
+  service(name = 'percentage', sla_policy=PercentageSlaPolicy(percentage=50, duration_secs=60)),
+  coordinator_service(name = 'coordinator', sla_policy=CoordinatorSlaPolicy(coordinator_url='http://localhost:8080')),
+]

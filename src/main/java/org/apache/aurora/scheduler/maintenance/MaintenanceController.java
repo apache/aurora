@@ -11,42 +11,68 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.state;
+package org.apache.aurora.scheduler.maintenance;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.AbstractScheduledService;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.gen.HostMaintenanceRequest;
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.PercentageSlaPolicy;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.scheduler.BatchWorker;
 import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.sla.SlaManager;
+import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 import org.apache.aurora.scheduler.storage.entities.IHostStatus;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ISlaPolicy;
 import org.apache.mesos.v1.Protos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -80,6 +106,17 @@ public interface MaintenanceController {
   Set<IHostStatus> drain(Set<String> hosts);
 
   /**
+   * Initiate an SLA-aware drain of all active tasks on {@code hosts}.
+   *
+   * @param hosts Hosts to drain.
+   * @param defaultSlaPolicy SlaPolicy to use if a task does not have an SlaPolicy.
+   * @param timeoutSecs Interval after which tasks will be forcefully drained without checking SLA.
+   * @return The adjusted state of the hosts. Hosts without any active tasks will be immediately
+   *         moved to DRAINED.
+   */
+  Set<IHostStatus> slaDrain(Set<String> hosts, SlaPolicy defaultSlaPolicy, long timeoutSecs);
+
+  /**
    * Drain tasks defined by the inverse offer.
    * This method doesn't set any host attributes.
    *
@@ -111,47 +148,75 @@ public interface MaintenanceController {
    */
   Set<IHostStatus> endMaintenance(Set<String> hosts);
 
-  class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
+  /**
+   * Records the maintenance requests for hosts and drains any active tasks from the host
+   * asynchronously.
+   *
+   * Tasks are drained iff it will satisfy the required SLA for the task. Task's SLA is either the
+   * {@link SlaPolicy} configured as part of the TaskConfig or the default {@link SlaPolicy}
+   * specified as part of the maintenance request. If neither then the task is drained immediately.
+   *
+   * In order to avoid tasks from blocking maintenance perpetually each maintenance request has a
+   * timeout after which all tasks forcefully drained.
+   */
+  class MaintenanceControllerImpl
+      extends AbstractScheduledService implements MaintenanceController, EventSubscriber {
     private static final Logger LOG = LoggerFactory.getLogger(MaintenanceControllerImpl.class);
+
+    @VisibleForTesting
+    @Qualifier
+    @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+    public @interface PollingInterval { }
+
+    @VisibleForTesting
+    static final String DRAINING_MESSAGE = "Draining machine for maintenance.";
+
+    private static final String MISSING_MAINTENANCE_REQUEST = "missing_maintenance_request";
+    private static final SlaPolicy ZERO_PERCENT_SLA = SlaPolicy.percentageSlaPolicy(
+        new PercentageSlaPolicy()
+            .setPercentage(0)
+            .setDurationSecs(0));
+
     private final Storage storage;
-    private final StateManager stateManager;
+    private final Amount<Long, Time> pollingInterval;
     private final TaskEventBatchWorker batchWorker;
+    private final SlaManager slaManager;
+    private final StateManager stateManager;
+
+    private final AtomicLong missingMaintenanceCounter;
 
     @Inject
     public MaintenanceControllerImpl(
         Storage storage,
+        @PollingInterval Amount<Long, Time> pollingInterval,
+        TaskEventBatchWorker batchWorker,
+        SlaManager slaManager,
         StateManager stateManager,
-        TaskEventBatchWorker batchWorker) {
+        StatsProvider statsProvider) {
 
       this.storage = requireNonNull(storage);
-      this.stateManager = requireNonNull(stateManager);
+      this.pollingInterval = checkNotNull(pollingInterval);
       this.batchWorker = requireNonNull(batchWorker);
+      this.slaManager = requireNonNull(slaManager);
+      this.stateManager = requireNonNull(stateManager);
+      this.missingMaintenanceCounter = statsProvider.makeCounter(MISSING_MAINTENANCE_REQUEST);
     }
 
-    private Set<String> drainTasksOnHost(String host, MutableStoreProvider store) {
+    private Set<String> drainTasksOnHost(String host, StoreProvider store) {
       Query.Builder query = Query.slaveScoped(host).active();
-      Set<String> activeTasks = FluentIterable.from(store.getTaskStore().fetchTasks(query))
-          .transform(Tasks::id)
-          .toSet();
 
-      if (activeTasks.isEmpty()) {
+      List<IScheduledTask> candidates = new ArrayList<>(store.getTaskStore().fetchTasks(query));
+
+      if (candidates.isEmpty()) {
         LOG.info("No tasks to drain on host: {}", host);
-        // Simple way to avoid the log message if there are no tasks.
-        return activeTasks;
-      } else {
-        LOG.info("Draining tasks: {} on host: {}", activeTasks, host);
-        for (String taskId : activeTasks) {
-          stateManager.changeState(
-              store,
-              taskId,
-              Optional.empty(),
-              ScheduleStatus.DRAINING,
-              DRAINING_MESSAGE);
-        }
-
-        return activeTasks;
+        return Collections.emptySet();
       }
 
+      // shuffle the candidates to avoid head-of-line blocking
+      Collections.shuffle(candidates);
+      candidates.forEach(task -> drainTask(task, store));
+
+      return candidates.stream().map(Tasks::id).collect(Collectors.toSet());
     }
 
     private Set<IHostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
@@ -206,13 +271,46 @@ public interface MaintenanceController {
           storeProvider -> setMaintenanceMode(storeProvider, hosts, MaintenanceMode.SCHEDULED));
     }
 
-    @VisibleForTesting
-    static final Optional<String> DRAINING_MESSAGE =
-        Optional.of("Draining machine for maintenance.");
+    private void recordMaintenanceRequests(
+        MutableStoreProvider store,
+        Set<String> hosts,
+        SlaPolicy defaultSlaPolicy,
+        long timeoutSecs) {
+
+      hosts.forEach(
+          host -> store.getHostMaintenanceStore().saveHostMaintenanceRequest(
+              IHostMaintenanceRequest.build(
+                  new HostMaintenanceRequest()
+                      .setHost(host)
+                      .setDefaultSlaPolicy(defaultSlaPolicy)
+                      .setTimeoutSecs(timeoutSecs)
+                      .setCreatedTimestampMs(System.currentTimeMillis()))));
+    }
 
     @Override
     public Set<IHostStatus> drain(Set<String> hosts) {
-      return storage.write(store -> watchDrainingTasks(store, hosts));
+      return storage.write(store -> {
+        // Create a dummy maintenance request zero percent sla and timeout to force drain.
+        recordMaintenanceRequests(store, hosts, ZERO_PERCENT_SLA, 0);
+        return watchDrainingTasks(store, hosts);
+      });
+    }
+
+    @Override
+    public Set<IHostStatus> slaDrain(
+        Set<String> hosts,
+        SlaPolicy defaultSlaPolicy,
+        long timeoutSecs) {
+
+      // We can have only one maintenance request per host at any time.
+      // So we will simply overwrite any existing request. If the current one is actively handled,
+      // during the write, the new one will just be a no-op, since the host is already being
+      // drained. If host is in DRAINED it will be moved back into DRAINING and then back into
+      // DRAINED without having to perform any work.
+      return storage.write(store -> {
+        recordMaintenanceRequests(store, hosts, defaultSlaPolicy, timeoutSecs);
+        return setMaintenanceMode(store, hosts, DRAINING);
+      });
     }
 
     private Optional<String> getHostname(Protos.InverseOffer offer) {
@@ -230,7 +328,11 @@ public interface MaintenanceController {
 
       if (hostname.isPresent()) {
         String host = hostname.get();
-        storage.write(storeProvider -> drainTasksOnHost(host, storeProvider));
+        storage.write(storeProvider -> {
+          // Create a dummy maintenance request zero percent sla and timeout to force drain.
+          recordMaintenanceRequests(storeProvider, ImmutableSet.of(host), ZERO_PERCENT_SLA, 0);
+          return drainTasksOnHost(host, storeProvider);
+        });
       } else {
         LOG.error("Unable to drain tasks on agent {} because "
             + "no hostname attached to inverse offer {}.", offer.getAgentId(), offer.getId());
@@ -259,17 +361,21 @@ public interface MaintenanceController {
       return storage.read(storeProvider -> {
         // Warning - this is filtering _all_ host attributes.  If using this to frequently query
         // for a small set of hosts, a getHostAttributes variant should be added.
-        return FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
+        return storeProvider.getAttributeStore().getHostAttributes().stream()
             .filter(Predicates.compose(Predicates.in(hosts), HOST_NAME))
-            .transform(ATTRS_TO_STATUS)
-            .toSet();
+            .map(ATTRS_TO_STATUS)
+            .collect(Collectors.toSet());
       });
     }
 
     @Override
     public Set<IHostStatus> endMaintenance(final Set<String> hosts) {
       return storage.write(
-          storeProvider -> setMaintenanceMode(storeProvider, hosts, MaintenanceMode.NONE));
+          storeProvider -> {
+            hosts.forEach(
+                h -> storeProvider.getHostMaintenanceStore().removeHostMaintenanceRequest(h));
+            return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.NONE);
+          });
     }
 
     private Set<IHostStatus> setMaintenanceMode(
@@ -289,6 +395,76 @@ public interface MaintenanceController {
         }
       }
       return statuses.build();
+    }
+
+    @VisibleForTesting
+    void runForTest() {
+      runOneIteration();
+    }
+
+    @Timed
+    @Override
+    protected void runOneIteration() {
+      LOG.info("Looking for hosts in DRAINING state");
+      storage.read(store -> {
+        store.getAttributeStore()
+            .getHostAttributes()
+            .stream()
+            .filter(h -> h.getMode() == DRAINING)
+            .forEach(h -> {
+              if (drainTasksOnHost(h.getHost(), store).isEmpty()) {
+                storage.write(mutable -> setMaintenanceMode(
+                    mutable,
+                    ImmutableSet.of(h.getHost()),
+                    DRAINED));
+              }
+            });
+        return null;
+      });
+    }
+
+    @Override
+    protected Scheduler scheduler() {
+      return Scheduler.newFixedDelaySchedule(
+          pollingInterval.getValue(),
+          pollingInterval.getValue(),
+          pollingInterval.getUnit().getTimeUnit());
+    }
+
+    private void drainTask(IScheduledTask task, StoreProvider store) {
+      String host = task.getAssignedTask().getSlaveHost();
+      Optional<IHostMaintenanceRequest> hostMaintenanceRequest =
+          store.getHostMaintenanceStore().getHostMaintenanceRequest(host);
+      if (!hostMaintenanceRequest.isPresent()) {
+        LOG.error("No maintenance request found for host: {}. Assuming SLA not satisfied.", host);
+        missingMaintenanceCounter.incrementAndGet();
+        return;
+      }
+
+      boolean force = false;
+      long expireMs =
+          System.currentTimeMillis() - hostMaintenanceRequest.get().getCreatedTimestampMs();
+      if (hostMaintenanceRequest.get().getTimeoutSecs()
+            < TimeAmount.of(expireMs, Time.MILLISECONDS).as(Time.SECONDS)) {
+        LOG.warn("Maintenance request timed out for host: {} after {} secs. Forcing drain of {}.",
+            host, hostMaintenanceRequest.get().getTimeoutSecs(), Tasks.id(task));
+        force = true;
+      }
+
+      final ISlaPolicy slaPolicy = task.getAssignedTask().getTask().isSetSlaPolicy()
+          ? task.getAssignedTask().getTask().getSlaPolicy()
+          : hostMaintenanceRequest.get().getDefaultSlaPolicy();
+
+      slaManager.checkSlaThenAct(
+          task,
+          slaPolicy,
+          storeProvider -> stateManager.changeState(
+              storeProvider,
+              Tasks.id(task),
+              Optional.empty(),
+              ScheduleStatus.DRAINING,
+              Optional.of(DRAINING_MESSAGE)),
+          force);
     }
   }
 }

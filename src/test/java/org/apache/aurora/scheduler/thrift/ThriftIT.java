@@ -25,9 +25,12 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.application.ShutdownStage;
 import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Container;
@@ -48,10 +51,12 @@ import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.app.local.FakeNonVolatileStorage;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
+import org.apache.aurora.scheduler.maintenance.MaintenanceController;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
@@ -138,6 +143,10 @@ public class ThriftIT extends EasyMockTest {
             bindMock(StorageBackup.class);
             bindMock(SnapshotStore.class);
             bind(IServerInfo.class).toInstance(SERVER_INFO);
+            bind(new TypeLiteral<Amount<Long, Time>>() { })
+                .annotatedWith(
+                    MaintenanceController.MaintenanceControllerImpl.PollingInterval.class)
+                .toInstance(new TimeAmount(1, Time.MINUTES));
           }
 
           @Provides
@@ -181,6 +190,8 @@ public class ThriftIT extends EasyMockTest {
         true,
         true,
         false,
+        20,
+        1800,
         ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS);
 
     createThrift(configurationManagerSettings);
@@ -189,6 +200,7 @@ public class ThriftIT extends EasyMockTest {
 
     TaskConfig task = TaskTestUtil.makeConfig(TaskTestUtil.JOB).newBuilder();
     task.unsetExecutorConfig();
+    task.unsetSlaPolicy();
     task.setProduction(false)
         .setTier(TaskTestUtil.DEV_TIER_NAME)
         .setContainer(Container.docker(new DockerContainer()

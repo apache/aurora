@@ -231,9 +231,13 @@ public class CommandLineTest {
     expected.mesosLog.coordinatorElectionRetries = 42;
     expected.mesosLog.readTimeout = TEST_TIME;
     expected.mesosLog.writeTimeout = TEST_TIME;
-    expected.sla.slaRefreshInterval = TEST_TIME;
+    expected.sla.minRequiredInstances = 42;
+    expected.sla.maxParallelCoordinators = 42;
+    expected.sla.maxSlaDuration = TEST_TIME;
+    expected.sla.slaCoordinatorTimeout = TEST_TIME;
     expected.sla.slaProdMetrics = ImmutableList.of(MetricCategory.JOB_UPTIMES);
     expected.sla.slaNonProdMetrics = ImmutableList.of(MetricCategory.JOB_UPTIMES);
+    expected.sla.slaRefreshInterval = TEST_TIME;
     expected.webhook.webhookConfigFile = tempFile;
     expected.scheduler.maxRegistrationDelay = TEST_TIME;
     expected.scheduler.maxLeadingDuration = TEST_TIME;
@@ -251,6 +255,7 @@ public class CommandLineTest {
     expected.cron.cronMaxBatchSize = 42;
     expected.resourceSettings.enableRevocableCpus = false;
     expected.resourceSettings.enableRevocableRam = true;
+    expected.maintenance.hostMaintenancePollingInterval = TEST_TIME;
 
     assertAllNonDefaultParameters(expected);
 
@@ -385,7 +390,12 @@ public class CommandLineTest {
         "-cron_scheduling_max_batch_size=42",
         "-enable_revocable_cpus=false",
         "-enable_revocable_ram=true",
-        "-partition_aware=true"
+        "-partition_aware=true",
+        "-sla_coordinator_timeout=42days",
+        "-host_maintenance_polling_interval=42days",
+        "-max_parallel_coordinated_maintenance=42",
+        "-min_required_instances_for_sla_check=42",
+        "-max_sla_duration_secs=42days"
     );
     assertEqualOptions(expected, parsed);
   }

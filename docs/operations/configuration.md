@@ -312,19 +312,19 @@ increased).
 
 To enable this in the Scheduler, you can set the following options:
 
-    --enable_update_affinity=true
-    --update_affinity_reservation_hold_time=3mins
+    -enable_update_affinity=true
+    -update_affinity_reservation_hold_time=3mins
 
 You will need to tune the hold time to match the behavior you see in your cluster. If you have extremely
 high update throughput, you might have to extend it as processing updates could easily add significant
 delays between scheduling attempts. You may also have to tune scheduling parameters to achieve the
 throughput you need in your cluster. Some relevant settings (with defaults) are:
 
-    --max_schedule_attempts_per_sec=40
-    --initial_schedule_penalty=1secs
-    --max_schedule_penalty=1mins
-    --scheduling_max_batch_size=3
-    --max_tasks_per_schedule_attempt=5
+    -max_schedule_attempts_per_sec=40
+    -initial_schedule_penalty=1secs
+    -max_schedule_penalty=1mins
+    -scheduling_max_batch_size=3
+    -max_tasks_per_schedule_attempt=5
 
 There are metrics exposed by the Scheduler which can provide guidance on where the bottleneck is.
 Example metrics to look at:
@@ -337,3 +337,44 @@ Example metrics to look at:
 Most likely you'll run into limits with the number of update instances that can be processed per minute
 before you run into any other limits. So if your total work done per minute starts to exceed 2k instances,
 you may need to extend the update_affinity_reservation_hold_time.
+
+## Cluster Maintenance
+
+Aurora performs maintenance related task drains. One of the scheduler options that can control
+how often the scheduler polls for maintenance work can be controlled via,
+
+    -host_maintenance_polling_interval=1min
+
+## Enforcing SLA limitations
+
+Since tasks can specify their own `SLAPolicy`, the cluster needs to limit these SLA requirements.
+Too aggressive a requirement can permanently block any type of maintenance work
+(ex: OS/Kernel/Security upgrades) on a host and hold it hostage.
+
+An operator can control the limits for SLA requirements via these scheduler configuration options:
+
+    -max_sla_duration_secs=2hrs
+    -min_required_instances_for_sla_check=20
+
+_Note: These limits only apply for `CountSlaPolicy` and `PercentageSlaPolicy`._
+
+### Limiting Coordinator SLA
+
+With `CoordinatorSlaPolicy` the SLA calculation is off-loaded to an external HTTP service. Some
+relevant scheduler configuration options are,
+
+    -sla_coordinator_timeout=1min
+    -max_parallel_coordinated_maintenance=10
+
+Since handing off the SLA calculation to an external service can potentially block maintenance
+on hosts for an indefinite amount of time (either due to a mis-configured coordinator or due to
+a valid degraded service). In those situations the following metrics will be helpful to identify the
+offending tasks.
+
+    sla_coordinator_user_errors_*     (counter tracking number of times the coordinator for the task
+                                       returned a bad response.)
+    sla_coordinator_errors_*          (counter tracking number of times the scheduler was not able
+                                       to communicate with the coordinator of the task.)
+    sla_coordinator_lock_starvation_* (counter tracking number of times the scheduler was not able to
+                                       get the lock for the coordinator of the task.)
+

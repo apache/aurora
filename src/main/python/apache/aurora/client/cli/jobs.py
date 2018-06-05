@@ -379,6 +379,9 @@ class AddCommand(Verb):
     active = context.get_active_instances_or_raise(job, [instance])
     start = max(list(active)) + 1
 
+    if context.has_count_or_percentage_sla_policy(job):
+      context.print_out("WARNING: Adding instances without updating SlaPolicy.")
+
     api = context.get_api(job.cluster)
     resp = api.add_instances(job, instance, count)
     context.log_response_and_raise(resp)
@@ -410,6 +413,10 @@ class KillCommand(AbstractKillCommand):
       raise context.CommandError(EXIT_INVALID_PARAMETER,
           "The instances list cannot be omitted in a kill command!; "
           "use killall to kill all instances")
+
+    if context.has_count_or_percentage_sla_policy(job):
+      context.print_out("WARNING: Killing instances without updating SlaPolicy.")
+
     if context.options.strict:
       context.get_active_instances_or_raise(job, instances_arg)
     api = context.get_api(job.cluster)

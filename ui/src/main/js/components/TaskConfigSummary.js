@@ -70,6 +70,46 @@ function PartitionPolicy({ config }) {
     <td>{config.partitionPolicy.delaySecs}</td>
   </tr>];
 }
+
+function SlaPolicy({ config }) {
+  if (isNully(config.slaPolicy)) {
+    return null;
+  }
+
+  if (!isNully(config.slaPolicy.countSlaPolicy)) {
+    return [<tr>
+        <th rowSpan='2'>Count SLA Policy</th>
+        <td>count</td>
+        <td>{config.slaPolicy.countSlaPolicy.count}</td>
+      </tr>,
+      <tr>
+        <td>duration secs</td>
+        <td>{config.slaPolicy.countSlaPolicy.durationSecs}</td>
+      </tr>];
+  } else if (!isNully(config.slaPolicy.percentageSlaPolicy)) {
+    return [<tr>
+        <th rowSpan='2'>Percentage SLA Policy</th>
+        <td>precentage</td>
+        <td>{config.slaPolicy.percentageSlaPolicy.percentage + '%'}</td>
+      </tr>,
+      <tr>
+        <td>duration secs</td>
+        <td>{config.slaPolicy.percentageSlaPolicy.durationSecs}</td>
+      </tr>];
+  } else if (!isNully(config.slaPolicy.coordinatorSlaPolicy)) {
+    return [<tr>
+        <th rowSpan='4'>Coordinator SLA Policy</th>
+        <td>coordinator url</td>
+        <td>{config.slaPolicy.coordinatorSlaPolicy.coordinatorUrl}</td>
+      </tr>,
+      <tr>
+        <td>status key</td>
+        <td>{config.slaPolicy.coordinatorSlaPolicy.statusKey}</td>
+      </tr>];
+  }
+
+  return null;
+}
 /* eslint-enable */
 
 export function CronConfigSummary({ cronJob }) {
@@ -108,6 +148,7 @@ export function CronConfigSummary({ cronJob }) {
       </tr>
       <Metadata config={config} />
       <PartitionPolicy config={config} />
+      <SlaPolicy config={config} />
       <tr>
         <th>Contact</th>
         <td colSpan='2'>{config.contactEmail}</td>
@@ -136,6 +177,7 @@ export default function TaskConfigSummary({ config, instances }) {
       </tr>
       <Metadata config={config} />
       <PartitionPolicy config={config} />
+      <SlaPolicy config={config} />
       <tr>
         <th>Contact</th>
         <td colSpan='2'>{config.contactEmail}</td>

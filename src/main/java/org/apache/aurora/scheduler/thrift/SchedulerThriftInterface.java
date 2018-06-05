@@ -63,6 +63,7 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskQuery;
@@ -76,11 +77,11 @@ import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
+import org.apache.aurora.scheduler.maintenance.MaintenanceController;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.reconciliation.TaskReconciler;
-import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
@@ -156,6 +157,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   @VisibleForTesting
   static final String DRAIN_HOSTS = STAT_PREFIX + "drainHosts";
   @VisibleForTesting
+  static final String SLA_DRAIN_HOSTS = STAT_PREFIX + "slaDrainHosts";
+  @VisibleForTesting
   static final String MAINTENANCE_STATUS = STAT_PREFIX + "maintenanceStatus";
   @VisibleForTesting
   static final String END_MAINTENANCE = STAT_PREFIX + "endMaintenance";
@@ -190,6 +193,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final AtomicLong restartShardsCounter;
   private final AtomicLong startMaintenanceCounter;
   private final AtomicLong drainHostsCounter;
+  private final AtomicLong slaDrainHostsCounter;
   private final AtomicLong maintenanceStatusCounter;
   private final AtomicLong endMaintenanceCounter;
   private final AtomicLong addInstancesCounter;
@@ -237,6 +241,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.restartShardsCounter = statsProvider.makeCounter(RESTART_SHARDS);
     this.startMaintenanceCounter = statsProvider.makeCounter(START_MAINTENANCE);
     this.drainHostsCounter = statsProvider.makeCounter(DRAIN_HOSTS);
+    this.slaDrainHostsCounter = statsProvider.makeCounter(SLA_DRAIN_HOSTS);
     this.maintenanceStatusCounter = statsProvider.makeCounter(MAINTENANCE_STATUS);
     this.endMaintenanceCounter = statsProvider.makeCounter(END_MAINTENANCE);
     this.addInstancesCounter = statsProvider.makeCounter(ADD_INSTANCES);
@@ -586,6 +591,14 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
+  public Response slaDrainHosts(Hosts hosts, SlaPolicy defaultSlaPolicy, long timeoutSecs) {
+    slaDrainHostsCounter.addAndGet(hosts.getHostNamesSize());
+    return ok(Result.drainHostsResult(
+        new DrainHostsResult().setStatuses(IHostStatus.toBuildersSet(
+            maintenance.slaDrain(hosts.getHostNames(), defaultSlaPolicy, timeoutSecs)))));
+  }
+
+  @Override
   public Response forceTaskState(String taskId, ScheduleStatus status) {
     checkNotBlank(taskId);
     requireNonNull(status);
@@ -807,9 +820,12 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     IJobUpdateRequest request;
     try {
-      request = IJobUpdateRequest.build(new JobUpdateRequest(mutableRequest).setTaskConfig(
-          configurationManager.validateAndPopulate(
-              ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
+      request = IJobUpdateRequest.build(
+          new JobUpdateRequest(mutableRequest)
+              .setTaskConfig(configurationManager.validateAndPopulate(
+                  ITaskConfig.build(mutableRequest.getTaskConfig()),
+                  mutableRequest.getInstanceCount())
+              .newBuilder()));
     } catch (TaskDescriptionException e) {
       return error(INVALID_REQUEST, e);
     }

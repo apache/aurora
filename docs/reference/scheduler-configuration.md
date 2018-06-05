@@ -106,6 +106,8 @@ Optional flags:
 	Minimum guaranteed time for task history retention before any pruning is attempted.
 -history_prune_threshold (default (2, days))
 	Time after which the scheduler will prune terminated task history.
+-host_maintenance_polling_interval (default (1, minute))
+	Interval between polling for pending host maintenance requests.
 -hostname
 	The hostname to advertise in ZooKeeper instead of the locally-resolved hostname.
 -http_authentication_mechanism (default NONE)
@@ -134,6 +136,8 @@ Optional flags:
 	Maximum delay between attempts to schedule a flapping task.
 -max_leading_duration (default (1, days))
 	After leading for this duration, the scheduler should commit suicide.
+-max_parallel_coordinated_maintenance (default 10)
+	Maximum number of coordinators that can be contacted in parallel.
 -max_registration_delay (default (1, mins))
 	Max allowable delay to allow the driver to register before aborting
 -max_reschedule_task_delay_on_startup (default (30, secs))
@@ -144,6 +148,8 @@ Optional flags:
 	Maximum number of scheduling attempts to make per second.
 -max_schedule_penalty (default (1, mins))
 	Maximum delay between attempts to schedule a PENDING tasks.
+-max_sla_duration_secs (default (2, hrs))
+	Maximum duration window for which SLA requirements are to be satisfied. This does not apply to jobs that have a CoordinatorSlaPolicy.
 -max_status_update_batch_size (default 1000) [must be > 0]
 	The maximum number of status updates that can be processed in a batch.
 -max_task_event_batch_size (default 300) [must be > 0]
@@ -156,6 +162,8 @@ Optional flags:
 	Upper limit on the number of failures allowed during a job update. This helps cap potentially unbounded entries into storage.
 -min_offer_hold_time (default (5, mins))
 	Minimum amount of time to hold a resource offer before declining.
+-min_required_instances_for_sla_check (default 20)
+	Minimum number of instances required for a job to be eligible for SLA check. This does not apply to jobs that have a CoordinatorSlaPolicy.
 -native_log_election_retries (default 20)
 	The maximum number of attempts to obtain a new log writer.
 -native_log_election_timeout (default (15, secs))
@@ -214,6 +222,8 @@ Optional flags:
 	Path to shiro.ini for authentication and authorization configuration.
 -shiro_realm_modules (default [class org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule])
 	Guice modules for configuring Shiro Realms.
+-sla_coordinator_timeout (default (1, min)) [must be > 0]
+	Timeout interval for communicating with Coordinator.
 -sla_non_prod_metrics (default [])
 	Metric categories collected for non production tasks.
 -sla_prod_metrics (default [JOB_UPTIMES, PLATFORM_UPTIME, MEDIANS])

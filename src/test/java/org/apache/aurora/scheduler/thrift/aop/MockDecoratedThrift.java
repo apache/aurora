@@ -36,6 +36,7 @@ import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.http.api.security.AuthorizingParam;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -197,6 +198,12 @@ public class MockDecoratedThrift implements AnnotatedAuroraAdmin {
   @Override
   public Response endMaintenance(Hosts hosts) throws TException {
     return this.annotatedAuroraAdmin.endMaintenance(hosts);
+  }
+
+  @Override
+  public Response slaDrainHosts(Hosts hosts, SlaPolicy defaultSlaPolicy, long timeoutSecs)
+      throws TException {
+    return this.annotatedAuroraAdmin.slaDrainHosts(hosts, defaultSlaPolicy, timeoutSecs);
   }
 
   @Override

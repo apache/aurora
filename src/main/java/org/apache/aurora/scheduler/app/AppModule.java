@@ -26,6 +26,7 @@ import com.google.inject.AbstractModule;
 
 import org.apache.aurora.GuiceUtils;
 import org.apache.aurora.common.inject.TimedInterceptor;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
@@ -46,6 +47,7 @@ import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.http.JettyServerModule;
+import org.apache.aurora.scheduler.maintenance.MaintenanceModule;
 import org.apache.aurora.scheduler.mesos.SchedulerDriverModule;
 import org.apache.aurora.scheduler.metadata.MetadataModule;
 import org.apache.aurora.scheduler.offers.OfferManagerModule;
@@ -146,6 +148,8 @@ public class AppModule extends AbstractModule {
             opts.main.allowGpuResource,
             opts.app.enableMesosFetcher,
             opts.app.allowContainerVolumes,
+            opts.sla.minRequiredInstances,
+            opts.sla.maxSlaDuration.as(Time.SECONDS),
             opts.app.allowedJobEnvironments),
         opts.main.driverImpl,
         opts);
@@ -190,6 +194,7 @@ public class AppModule extends AbstractModule {
     install(new StateModule(options));
     install(new SlaModule(options.sla));
     install(new UpdaterModule(options.updater));
+    install(new MaintenanceModule(options.maintenance));
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
   }
 }

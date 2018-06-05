@@ -244,3 +244,19 @@ class AuroraCommandContext(Context):
       raise self.CommandError(EXIT_INVALID_PARAMETER,
           "Invalid instance parameter: %s" % (list(unrecognized)))
     return active
+
+  def has_count_or_percentage_sla_policy(self, key):
+    """Returns true if any of the tasks has count or percentage sla policy, false otherwise.
+
+    :param key: Job key
+    :type key: AuroraJobKey
+    :return: true if any of the tasks has count or percentage sla policy, false otherwise.
+    """
+    for task in self.get_active_tasks(key):
+      if task.assignedTask.task.slaPolicy:
+        if task.assignedTask.task.slaPolicy.percentageSlaPolicy:
+          return True
+        if task.assignedTask.task.slaPolicy.countSlaPolicy:
+          return True
+
+    return False

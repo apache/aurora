@@ -31,6 +31,8 @@ Environment="JAVA_OPTS='-Djava.library.path=/usr/lib \
   -Xdebug \
   -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005'"
 WorkingDirectory=/home/vagrant/aurora/dist/install/aurora-scheduler
+
+# min_offer_hold_time is set to 1mins to shorten time to update attributes on offers. AURORA-1985.
 ExecStart=/home/vagrant/aurora/dist/install/aurora-scheduler/bin/aurora-scheduler \
   -cluster_name=devcluster \
   -hostname=aurora.local \
@@ -58,7 +60,9 @@ ExecStart=/home/vagrant/aurora/dist/install/aurora-scheduler/bin/aurora-schedule
   -allow_container_volumes=true \
   -offer_filter_duration=0secs \
   -mesos_driver=V1_DRIVER \
-  -unavailability_threshold=1mins
+  -unavailability_threshold=1mins \
+  -min_required_instances_for_sla_check=2 \
+  -min_offer_hold_time=1mins
 User=root
 Group=root
 Restart=always

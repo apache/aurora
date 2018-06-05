@@ -50,6 +50,7 @@ import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.Metadata;
+import org.apache.aurora.gen.PercentageSlaPolicy;
 import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
@@ -62,6 +63,7 @@ import org.apache.aurora.gen.ResponseDetail;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
@@ -77,10 +79,10 @@ import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
+import org.apache.aurora.scheduler.maintenance.MaintenanceController;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.reconciliation.TaskReconciler;
-import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
@@ -153,6 +155,7 @@ import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_J
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.PRUNE_TASKS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.RESTART_SHARDS;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.SLA_DRAIN_HOSTS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.START_JOB_UPDATE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.START_MAINTENANCE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.jobAlreadyExistsMessage;
@@ -1081,6 +1084,59 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         IHostStatus.toBuildersSet(draining),
         thrift.drainHosts(hosts).getResult().getDrainHostsResult().getStatuses());
     assertEquals(1L, statsProvider.getLongValue(DRAIN_HOSTS));
+    assertEquals(
+        IHostStatus.toBuildersSet(draining),
+        thrift.maintenanceStatus(hosts).getResult().getMaintenanceStatusResult()
+            .getStatuses());
+    assertEquals(2L, statsProvider.getLongValue(MAINTENANCE_STATUS));
+    assertEquals(
+        IHostStatus.toBuildersSet(drained),
+        thrift.maintenanceStatus(hosts).getResult().getMaintenanceStatusResult()
+            .getStatuses());
+    assertEquals(3L, statsProvider.getLongValue(MAINTENANCE_STATUS));
+    assertEquals(
+        IHostStatus.toBuildersSet(none),
+        thrift.endMaintenance(hosts).getResult().getEndMaintenanceResult().getStatuses());
+    assertEquals(1L, statsProvider.getLongValue(END_MAINTENANCE));
+  }
+
+  @Test
+  public void testSLAHostMaintenance() throws Exception {
+    Set<String> hostnames = ImmutableSet.of("a");
+    SlaPolicy defaultSlaPolicy = SlaPolicy.percentageSlaPolicy(
+        new PercentageSlaPolicy().setPercentage(95));
+    Set<IHostStatus> none = status("a", NONE);
+    Set<IHostStatus> scheduled = status("a", SCHEDULED);
+    Set<IHostStatus> draining = status("a", DRAINING);
+    Set<IHostStatus> drained = status("a", DRAINING);
+    expect(maintenance.getStatus(hostnames)).andReturn(none);
+    expect(maintenance.startMaintenance(hostnames)).andReturn(scheduled);
+    expect(maintenance.slaDrain(hostnames, defaultSlaPolicy, 10)).andReturn(draining);
+    expect(maintenance.getStatus(hostnames)).andReturn(draining);
+    expect(maintenance.getStatus(hostnames)).andReturn(drained);
+    expect(maintenance.endMaintenance(hostnames)).andReturn(none);
+
+    control.replay();
+
+    Hosts hosts = new Hosts(hostnames);
+
+    assertEquals(
+        IHostStatus.toBuildersSet(none),
+        thrift.maintenanceStatus(hosts).getResult().getMaintenanceStatusResult()
+            .getStatuses());
+    assertEquals(1L, statsProvider.getLongValue(MAINTENANCE_STATUS));
+    assertEquals(
+        IHostStatus.toBuildersSet(scheduled),
+        thrift.startMaintenance(hosts).getResult().getStartMaintenanceResult()
+            .getStatuses());
+    assertEquals(1L, statsProvider.getLongValue(START_MAINTENANCE));
+    assertEquals(
+        IHostStatus.toBuildersSet(draining),
+        thrift.slaDrainHosts(hosts, defaultSlaPolicy, 10)
+            .getResult()
+            .getDrainHostsResult()
+            .getStatuses());
+    assertEquals(1L, statsProvider.getLongValue(SLA_DRAIN_HOSTS));
     assertEquals(
         IHostStatus.toBuildersSet(draining),
         thrift.maintenanceStatus(hosts).getResult().getMaintenanceStatusResult()

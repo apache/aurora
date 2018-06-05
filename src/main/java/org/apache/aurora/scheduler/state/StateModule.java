@@ -18,10 +18,8 @@ import javax.inject.Singleton;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
-import com.google.inject.Binder;
 import com.google.inject.Module;
 
 import org.apache.aurora.scheduler.app.MoreModules;
@@ -31,7 +29,6 @@ import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.scheduling.TaskAssignerImplModule;
-import org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 
 /**
@@ -69,16 +66,7 @@ public class StateModule extends AbstractModule {
 
     PubsubEventModule.bindSubscriber(binder(), PartitionManager.class);
 
-    bindMaintenanceController(binder());
-
     bind(ClusterState.class).to(ClusterStateImpl.class);
     bind(ClusterStateImpl.class).in(Singleton.class);
-  }
-
-  @VisibleForTesting
-  static void bindMaintenanceController(Binder binder) {
-    binder.bind(MaintenanceController.class).to(MaintenanceControllerImpl.class);
-    binder.bind(MaintenanceControllerImpl.class).in(Singleton.class);
-    PubsubEventModule.bindSubscriber(binder, MaintenanceControllerImpl.class);
   }
 }

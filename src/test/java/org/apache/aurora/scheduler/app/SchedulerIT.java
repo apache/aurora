@@ -39,12 +39,14 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
@@ -64,6 +66,7 @@ import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
@@ -71,6 +74,7 @@ import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.maintenance.MaintenanceController;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
@@ -207,6 +211,11 @@ public class SchedulerIT extends BaseZooKeeperTest {
                 new ServerInfo()
                     .setClusterName(CLUSTER_NAME)
                     .setStatsUrlPrefix(STATS_URL_PREFIX)));
+
+        bind(new TypeLiteral<Amount<Long, Time>>() { })
+            .annotatedWith(
+                MaintenanceController.MaintenanceControllerImpl.PollingInterval.class)
+            .toInstance(new TimeAmount(1, Time.MINUTES));
       }
     };
     ZooKeeperConfig zkClientConfig =

@@ -91,6 +91,8 @@ public final class TaskTestUtil {
           true,
           true,
           true,
+          2,
+          1800L,
           ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS);
   public static final ExecutorID EXECUTOR_ID = ExecutorID.newBuilder()
       .setValue("PLACEHOLDER")
@@ -126,7 +128,7 @@ public final class TaskTestUtil {
         .setPriority(1)
         .setMaxTaskFailures(-1)
         .setProduction(prod)
-        .setTier(PROD_TIER_NAME)
+        .setTier(prod ? PROD_TIER_NAME : DEV_TIER_NAME)
         .setPartitionPolicy(new PartitionPolicy().setDelaySecs(5).setReschedule(true))
         .setSlaPolicy(SlaPolicy.percentageSlaPolicy(
             new PercentageSlaPolicy().setPercentage(95.0).setDurationSecs(1800)))

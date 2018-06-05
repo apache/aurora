@@ -23,6 +23,7 @@ configuration design.
     - [Announcer Objects](#announcer-objects)
     - [Container Objects](#container)
     - [LifecycleConfig Objects](#lifecycleconfig-objects)
+    - [SlaPolicy Objects](#slapolicy-objects)
 - [Specifying Scheduling Constraints](#specifying-scheduling-constraints)
 - [Template Namespaces](#template-namespaces)
     - [mesos Namespace](#mesos-namespace)
@@ -343,7 +344,7 @@ Job Schema
   ```contact``` | String | Best email address to reach the owner of the job. For production jobs, this is usually a team mailing list.
   ```instances```| Integer | Number of instances (sometimes referred to as replicas or shards) of the task to create. (Default: 1)
   ```cron_schedule``` | String | Cron schedule in cron format. May only be used with non-service jobs. See [Cron Jobs](../features/cron-jobs.md) for more information. Default: None (not a cron job.)
-  ```cron_collision_policy``` | String | Policy to use when a cron job is triggered while a previous run is still active. KILL_EXISTING Kill the previous run, and schedule the new run CANCEL_NEW Let the previous run continue, and cancel the new run. (Default: KILL_EXISTING)
+  ```cron_collision_policy``` | String | Policy to use when a cron job is triggered while a previous run is still active. KILL\_EXISTING Kill the previous run, and schedule the new run CANCEL\_NEW Let the previous run continue, and cancel the new run. (Default: KILL_EXISTING)
   ```update_config``` | ```UpdateConfig``` object | Parameters for controlling the rate and policy of rolling updates.
   ```constraints``` | dict | Scheduling constraints for the tasks. See the section on the [constraint specification language](#specifying-scheduling-constraints)
   ```service``` | Boolean | If True, restart tasks regardless of success or failure. (Default: False)
@@ -359,6 +360,7 @@ Job Schema
   ```partition_policy``` | ```PartitionPolicy``` object | An optional partition policy that allows job owners to define how to handle partitions for running tasks (in partition-aware Aurora clusters)
   ```metadata``` | list of ```Metadata``` objects | list of ```Metadata``` objects for user's customized metadata information.
   ```executor_config``` | ```ExecutorConfig``` object | Allows choosing an alternative executor defined in `custom_executor_config` to be used instead of Thermos. Tasks will be launched with Thermos as the executor by default. See [Custom Executors](../features/custom-executors.md) for more info.
+  ```sla_policy``` |  Choice of ```CountSlaPolicy```, ```PercentageSlaPolicy``` or ```CoordinatorSlaPolicy``` object | An optional SLA policy that allows job owners to describe the SLA requirements for the job. See [SlaPolicy Objects](#slapolicy-objects) for more information.
 
 
 ### UpdateConfig Objects
@@ -564,7 +566,7 @@ See [Docker Command Line Reference](https://docs.docker.com/reference/commandlin
   ```graceful_shutdown_wait_secs``` | Integer | The amount of time (in seconds) to wait after hitting the ```graceful_shutdown_endpoint``` before proceeding with the [task termination lifecycle](https://aurora.apache.org/documentation/latest/reference/task-lifecycle/#forceful-termination-killing-restarting). (Default: 5)
   ```shutdown_wait_secs```          | Integer | The amount of time (in seconds) to wait after hitting the ```shutdown_endpoint``` before proceeding with the [task termination lifecycle](https://aurora.apache.org/documentation/latest/reference/task-lifecycle/#forceful-termination-killing-restarting). (Default: 5)
 
-#### graceful_shutdown_endpoint
+#### graceful\_shutdown\_endpoint
 
 If the Job is listening on the port as specified by the HttpLifecycleConfig
 (default: `health`), a HTTP POST request will be sent over localhost to this
@@ -579,6 +581,34 @@ If the Job is listening on the port as specified by the HttpLifecycleConfig
 endpoint to request as a final warning before being shut down.  If the task
 does not shut down on its own after `shutdown_wait_secs` seconds, it will be
 forcefully killed.
+
+
+### SlaPolicy Objects
+
+Configuration for specifying custom [SLA requirements](../features/sla-requirements.md) for a job. There are 3 supported SLA policies
+namely, [`CountSlaPolicy`](#countslapolicy-objects), [`PercentageSlaPolicy`](#percentageslapolicy-objects) and [`CoordinatorSlaPolicy`](#coordinatorslapolicy-objects).
+
+
+### CountSlaPolicy Objects
+
+  param                             | type    | description
+  -----                             | :----:  | -----------
+  ```count```                       | Integer | The number of active instances required every `durationSecs`.
+  ```duration_secs```               | Integer | Minimum time duration a task needs to be `RUNNING` to be treated as active.
+
+### PercentageSlaPolicy Objects
+
+  param                             | type    | description
+  -----                             | :----:  | -----------
+  ```percentage```                  | Float   | The percentage of active instances required every `durationSecs`.
+  ```duration_secs```               | Integer | Minimum time duration a task needs to be `RUNNING` to be treated as active.
+
+### CoordinatorSlaPolicy Objects
+
+  param                             | type    | description
+  -----                             | :----:  | -----------
+  ```coordinator_url```             | String  | The URL to the [Coordinator](../features/sla-requirements.md#coordinator) service to be contacted before performing SLA affecting actions (job updates, host drains etc).
+  ```status_key```                  | String  | The field in the Coordinator response that indicates the SLA status for working on the task. (Default: `drain`)
 
 
 Specifying Scheduling Constraints

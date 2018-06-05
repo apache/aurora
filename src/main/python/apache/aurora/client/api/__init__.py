@@ -33,8 +33,10 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateQuery,
     JobUpdateRequest,
     Metadata,
+    PercentageSlaPolicy,
     Resource,
     ResourceAggregate,
+    SlaPolicy,
     TaskQuery
 )
 
@@ -297,6 +299,16 @@ class AuroraClientAPI(object):
   def drain_hosts(self, hosts):
     log.info("Draining tasks on: %s" % hosts.hostNames)
     return self._scheduler_proxy.drainHosts(hosts)
+
+  def sla_drain_hosts(self, hosts, percentage=None, duration=None, timeout=None):
+    log.info("Asking scheduler to drain tasks by SLA on: %s" % hosts.hostNames)
+    return self._scheduler_proxy.slaDrainHosts(
+      hosts,
+      SlaPolicy(
+        percentageSlaPolicy=PercentageSlaPolicy(
+          percentage=percentage,
+          durationSecs=duration)),
+      timeout)
 
   def maintenance_status(self, hosts):
     log.info("Maintenance status for: %s" % hosts.hostNames)

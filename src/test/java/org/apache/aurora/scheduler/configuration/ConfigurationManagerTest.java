@@ -22,6 +22,8 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.gen.AppcImage;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.CoordinatorSlaPolicy;
+import org.apache.aurora.gen.CountSlaPolicy;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -33,6 +35,8 @@ import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.Mode;
+import org.apache.aurora.gen.PercentageSlaPolicy;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
@@ -74,6 +78,9 @@ public class ConfigurationManagerTest {
 
   private static final ImmutableSet<Container._Fields> ALL_CONTAINER_TYPES =
       ImmutableSet.copyOf(Container._Fields.values());
+  private static final int MIN_REQUIRED_INSTANCES = 20;
+  private static final long MAX_SLA_DURATION_SECS = 7200;
+  private static final long DEFAULT_SLA_PERCENTAGE = 95;
 
   private static final JobKey JOB_KEY = new JobKey("owner-role", "devel", "email_stats");
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
@@ -126,6 +133,8 @@ public class ConfigurationManagerTest {
           false,
           true,
           false,
+          MIN_REQUIRED_INSTANCES,
+          MAX_SLA_DURATION_SECS,
           ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL,
@@ -139,6 +148,8 @@ public class ConfigurationManagerTest {
           true,
           true,
           true,
+          MIN_REQUIRED_INSTANCES,
+          MAX_SLA_DURATION_SECS,
           ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL,
@@ -160,7 +171,7 @@ public class ConfigurationManagerTest {
     taskConfig.getContainer().getDocker().setImage(null);
 
     expectTaskDescriptionException("A container must specify an image");
-    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(taskConfig));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(taskConfig), 100);
   }
 
   @Test
@@ -169,7 +180,7 @@ public class ConfigurationManagerTest {
     taskConfig.getContainer().getDocker().addToParameters(new DockerParameter("foo", "bar"));
 
     expectTaskDescriptionException(ConfigurationManager.NO_DOCKER_PARAMETERS);
-    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(taskConfig));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(taskConfig), 100);
   }
 
   @Test
@@ -179,7 +190,7 @@ public class ConfigurationManagerTest {
     builder.unsetExecutorConfig();
 
     expectTaskDescriptionException(ConfigurationManager.EXECUTOR_REQUIRED_WITH_DOCKER);
-    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 1);
   }
 
   @Test
@@ -187,7 +198,7 @@ public class ConfigurationManagerTest {
     TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
     builder.unsetExecutorConfig();
 
-    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -196,7 +207,7 @@ public class ConfigurationManagerTest {
         .setTier("pr/d"));
 
     expectTaskDescriptionException("Tier contains illegal characters");
-    CONFIGURATION_MANAGER.validateAndPopulate(config);
+    CONFIGURATION_MANAGER.validateAndPopulate(config, 100);
   }
 
   @Test
@@ -205,7 +216,7 @@ public class ConfigurationManagerTest {
     builder.getContainer().getDocker().setParameters(ImmutableList.of());
 
     ITaskConfig result =
-        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
 
     // The resulting task config should contain parameters supplied to the ConfigurationManager.
     List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
@@ -221,7 +232,7 @@ public class ConfigurationManagerTest {
     taskConfig.getContainer().getDocker().addToParameters(userParameter);
 
     ITaskConfig result = DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
-        ITaskConfig.build(taskConfig));
+        ITaskConfig.build(taskConfig), 100);
 
     // The resulting task config should contain parameters supplied from user config.
     List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
@@ -236,7 +247,7 @@ public class ConfigurationManagerTest {
         .setConstraint(TaskConstraint.value(
             new ValueConstraint(false, ImmutableSet.of(JOB_KEY.getRole() + "/f"))))));
 
-    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -246,7 +257,7 @@ public class ConfigurationManagerTest {
         .setName(DEDICATED_ATTRIBUTE)
         .setConstraint(TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("*/f"))))));
 
-    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -257,7 +268,7 @@ public class ConfigurationManagerTest {
         .setConstraint(TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("r/f"))))));
 
     expectTaskDescriptionException("Only r may use hosts dedicated for that role.");
-    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -267,7 +278,7 @@ public class ConfigurationManagerTest {
     builder.addToResources(ramMb(72));
 
     expectTaskDescriptionException("Multiple resource values are not supported for CPU, RAM");
-    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -275,7 +286,7 @@ public class ConfigurationManagerTest {
     TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
     builder.addToResources(namedPort("thrift"));
 
-    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -293,10 +304,12 @@ public class ConfigurationManagerTest {
             false,
             false,
             false,
+            MIN_REQUIRED_INSTANCES,
+            MAX_SLA_DURATION_SECS,
             ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS),
         TaskTestUtil.TIER_MANAGER,
         TaskTestUtil.THRIFT_BACKFILL,
-        TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(ITaskConfig.build(builder));
+        TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -312,15 +325,18 @@ public class ConfigurationManagerTest {
             new ConfigurationManagerSettings(
                     ALL_CONTAINER_TYPES,
                     true,
-                ImmutableList.of(new DockerParameter("foo", "bar")),
+                    ImmutableList.of(new DockerParameter("foo", "bar")),
                     false,
                     false,
                     false,
                     false,
+                    MIN_REQUIRED_INSTANCES,
+                    MAX_SLA_DURATION_SECS,
                     ".+"),
             TaskTestUtil.TIER_MANAGER,
             TaskTestUtil.THRIFT_BACKFILL,
-            TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(ITaskConfig.build(builder));
+            TestExecutorSettings.THERMOS_EXECUTOR)
+        .validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -333,7 +349,7 @@ public class ConfigurationManagerTest {
 
     expectTaskDescriptionException(NO_CONTAINER_VOLUMES);
 
-    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
   }
 
   @Test
@@ -343,7 +359,7 @@ public class ConfigurationManagerTest {
     builder.unsetTaskLinks();
 
     ITaskConfig populated =
-        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder), 100);
     assertEquals(ImmutableSet.of("health", "http"), populated.getTaskLinks().keySet());
   }
 
@@ -361,11 +377,173 @@ public class ConfigurationManagerTest {
           true,
           true,
           true,
+          MIN_REQUIRED_INSTANCES,
+          MAX_SLA_DURATION_SECS,
           "b.r"),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL,
       TestExecutorSettings.THERMOS_EXECUTOR)
             .validateAndPopulate(IJobConfiguration.build(jobConfiguration));
+  }
+
+  @Test
+  public void testCountSlaPolicyUnsupportedTier() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setTier(TaskTestUtil.DEV_TIER_NAME)
+            .setSlaPolicy(SlaPolicy.countSlaPolicy(
+                new CountSlaPolicy()
+                    .setCount(MIN_REQUIRED_INSTANCES))));
+
+    expectTaskDescriptionException("Tier 'tier-dev' does not support SlaPolicy.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
+  }
+
+  @Test
+  public void testCountSlaPolicyTooFewInstances() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setSlaPolicy(SlaPolicy.countSlaPolicy(
+                new CountSlaPolicy()
+                    .setCount(MIN_REQUIRED_INSTANCES))));
+
+    expectTaskDescriptionException(
+        "Job with fewer than 20 instances cannot have Percentage/Count SlaPolicy.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES - 1);
+  }
+
+  @Test
+  public void testCountSlaPolicyCountTooHigh() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setSlaPolicy(SlaPolicy.countSlaPolicy(
+                new CountSlaPolicy()
+                  .setCount(MIN_REQUIRED_INSTANCES))));
+
+    expectTaskDescriptionException(
+        "Current CountSlaPolicy: count=20 will not allow any instances to be killed. "
+            + "Must be less than instanceCount=20.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
+  }
+
+  @Test
+  public void testCountSlaPolicyDurationSecsTooHigh() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setSlaPolicy(SlaPolicy.countSlaPolicy(
+                new CountSlaPolicy()
+                    .setDurationSecs(MAX_SLA_DURATION_SECS + 1))));
+
+    expectTaskDescriptionException("CountSlaPolicy: durationSecs=7201 must be less than "
+        + "cluster-wide maximum of 7200 secs.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
+  }
+
+  @Test
+  public void testPercentageSlaPolicyUnsupportedTier() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setTier(TaskTestUtil.DEV_TIER_NAME)
+            .setSlaPolicy(SlaPolicy.percentageSlaPolicy(
+                new PercentageSlaPolicy()
+                    .setPercentage(DEFAULT_SLA_PERCENTAGE))));
+
+    expectTaskDescriptionException("Tier 'tier-dev' does not support SlaPolicy.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
+  }
+
+  @Test
+  public void testPercentageSlaPolicyTooFewInstances() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setSlaPolicy(SlaPolicy.percentageSlaPolicy(
+                new PercentageSlaPolicy()
+                    .setPercentage(DEFAULT_SLA_PERCENTAGE))));
+
+    expectTaskDescriptionException(
+        "Job with fewer than 20 instances cannot have Percentage/Count SlaPolicy.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES - 1);
+  }
+
+  @Test
+  public void testPercentageSlaPolicyPercentageTooHigh() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setSlaPolicy(SlaPolicy.percentageSlaPolicy(
+                new PercentageSlaPolicy()
+                    .setPercentage(100))));
+
+    expectTaskDescriptionException(
+        "Current PercentageSlaPolicy: percentage=100.000000 will not allow any instances "
+            + "to be killed. Must be less than 95.000000.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
+  }
+
+  @Test
+  public void testPercentageSlaPolicyDurationSecsTooHigh() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setSlaPolicy(SlaPolicy.percentageSlaPolicy(
+                new PercentageSlaPolicy()
+                    .setDurationSecs(MAX_SLA_DURATION_SECS + 1))));
+
+    expectTaskDescriptionException("PercentageSlaPolicy: durationSecs=7201 must be less than "
+        + "cluster-wide maximum of 7200 secs.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
+  }
+
+  @Test
+  public void testCoordinatorSlaPolicyUnsupportedTier() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setTier(TaskTestUtil.DEV_TIER_NAME)
+            .setSlaPolicy(SlaPolicy.coordinatorSlaPolicy(
+                new CoordinatorSlaPolicy()
+                    .setCoordinatorUrl("http://localhost"))));
+
+    expectTaskDescriptionException("Tier 'tier-dev' does not support SlaPolicy.");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
+  }
+
+  @Test
+  public void testCoordinatorSlaPolicyTooFewInstances() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setSlaPolicy(SlaPolicy.coordinatorSlaPolicy(
+                new CoordinatorSlaPolicy()
+                    .setCoordinatorUrl("http://localhost"))));
+
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES - 1);
   }
 
   private void expectTaskDescriptionException(String message) {

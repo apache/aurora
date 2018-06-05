@@ -66,7 +66,7 @@ public class CronIT extends EasyMockTest {
       new JobConfiguration()
           .setCronSchedule(CRONTAB_ENTRY.toString())
           .setKey(JOB_KEY.newBuilder())
-          .setInstanceCount(2)
+          .setInstanceCount(20)
           .setOwner(IDENTITY)
           .setCronCollisionPolicy(KILL_EXISTING)
           .setTaskConfig(makeTaskConfig()));

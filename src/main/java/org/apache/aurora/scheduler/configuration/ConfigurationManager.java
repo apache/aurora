@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
@@ -30,8 +29,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.CountSlaPolicy;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.PercentageSlaPolicy;
+import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.TierManager;
@@ -99,6 +101,8 @@ public class ConfigurationManager {
     private final boolean enableMesosFetcher;
     private final boolean allowContainerVolumes;
     private final Pattern allowedJobEnvironments;
+    private final int minRequiredInstances;
+    private final long maxSlaDurationSecs;
 
     public ConfigurationManagerSettings(
         ImmutableSet<Container._Fields> allowedContainerTypes,
@@ -108,6 +112,8 @@ public class ConfigurationManager {
         boolean allowGpuResource,
         boolean enableMesosFetcher,
         boolean allowContainerVolumes,
+        int minRequiredInstances,
+        long maxSlaDurationSecs,
         String allowedJobEnvironment) {
 
       this.allowedContainerTypes = requireNonNull(allowedContainerTypes);
@@ -118,6 +124,8 @@ public class ConfigurationManager {
       this.enableMesosFetcher = enableMesosFetcher;
       this.allowContainerVolumes = allowContainerVolumes;
       this.allowedJobEnvironments = Pattern.compile(requireNonNull(allowedJobEnvironment));
+      this.minRequiredInstances = minRequiredInstances;
+      this.maxSlaDurationSecs = maxSlaDurationSecs;
     }
   }
 
@@ -196,7 +204,9 @@ public class ConfigurationManager {
     }
 
     builder.setTaskConfig(
-        validateAndPopulate(ITaskConfig.build(builder.getTaskConfig())).newBuilder());
+        validateAndPopulate(
+            ITaskConfig.build(builder.getTaskConfig()),
+            builder.getInstanceCount()).newBuilder());
 
     // Only one of [service=true, cron_schedule] may be set.
     if (!Strings.isNullOrEmpty(job.getCronSchedule()) && builder.getTaskConfig().isIsService()) {
@@ -205,6 +215,89 @@ public class ConfigurationManager {
     }
 
     return IJobConfiguration.build(builder);
+  }
+
+  /**
+   * Validates the {@link TaskConfig}'s {@link SlaPolicy}, if any.
+   *
+   * A valid {@link SlaPolicy} is one that allows at least 1 instance to be drained for a job.
+   *
+   * @param config {@link TaskConfig} to be validated.
+   * @param instanceCount number of instances in the job.
+   * @throws TaskDescriptionException thrown when {@link SlaPolicy} is not valid.
+   */
+  private void validateSlaPolicy(
+      TaskConfig config,
+      int instanceCount) throws TaskDescriptionException {
+
+    if (config.isSetSlaPolicy()) {
+      if (tierManager.getTier(ITaskConfig.build(config)).isRevocable()
+          || tierManager.getTier(ITaskConfig.build(config)).isPreemptible()) {
+        throw new TaskDescriptionException(String.format(
+            "Tier '%s' does not support SlaPolicy.",
+            config.getTier()));
+      }
+
+      SlaPolicy slaPolicy = config.getSlaPolicy();
+      if (!slaPolicy.isSetCoordinatorSlaPolicy()
+          && instanceCount < settings.minRequiredInstances) {
+        throw new TaskDescriptionException(String.format(
+            "Job with fewer than %d instances cannot have Percentage/Count SlaPolicy.",
+            settings.minRequiredInstances));
+      }
+
+      if (slaPolicy.isSetCountSlaPolicy()) {
+        validateCountSlaPolicy(instanceCount, slaPolicy.getCountSlaPolicy());
+      }
+
+      if (slaPolicy.isSetPercentageSlaPolicy()) {
+        validatePercentageSlaPolicy(instanceCount, slaPolicy.getPercentageSlaPolicy());
+      }
+    }
+  }
+
+  private void validatePercentageSlaPolicy(
+      int instanceCount,
+      PercentageSlaPolicy slaPolicy) throws TaskDescriptionException {
+    if (slaPolicy.isSetPercentage()) {
+      double percentage = slaPolicy.getPercentage() / 100.0;
+      if (instanceCount - instanceCount * percentage < 1) {
+        throw new TaskDescriptionException(String.format(
+            "Current PercentageSlaPolicy: percentage=%f will not allow any instances to be killed. "
+                + "Must be less than %f.",
+            slaPolicy.getPercentage(),
+            ((double) (instanceCount - 1)) / instanceCount * 100.0));
+      }
+    }
+
+    if (slaPolicy.isSetDurationSecs()
+        && slaPolicy.getDurationSecs() > settings.maxSlaDurationSecs) {
+      throw new TaskDescriptionException(String.format(
+          "PercentageSlaPolicy: durationSecs=%d must be less than cluster-wide maximum of %d secs.",
+          slaPolicy.getDurationSecs(),
+          settings.maxSlaDurationSecs));
+    }
+  }
+
+  private void validateCountSlaPolicy(
+      int instanceCount,
+      CountSlaPolicy slaPolicy) throws TaskDescriptionException {
+    if (slaPolicy.isSetCount()
+        && instanceCount - slaPolicy.getCount() < 1) {
+      throw new TaskDescriptionException(String.format(
+          "Current CountSlaPolicy: count=%d will not allow any instances to be killed. "
+              + "Must be less than instanceCount=%d.",
+          slaPolicy.getCount(),
+          instanceCount));
+    }
+
+    if (slaPolicy.isSetDurationSecs()
+        && slaPolicy.getDurationSecs() > settings.maxSlaDurationSecs) {
+      throw new TaskDescriptionException(String.format(
+          "CountSlaPolicy: durationSecs=%d must be less than cluster-wide maximum of %d secs.",
+          slaPolicy.getDurationSecs(),
+          settings.maxSlaDurationSecs));
+    }
   }
 
   @VisibleForTesting
@@ -236,10 +329,14 @@ public class ConfigurationManager {
    *
    *
    * @param config Task config to validate and populate.
+   * @param instanceCount The number of instances in the job.
    * @return A reference to the modified {@code config} (for chaining).
    * @throws TaskDescriptionException If the task is invalid.
    */
-  public ITaskConfig validateAndPopulate(ITaskConfig config) throws TaskDescriptionException {
+  public ITaskConfig validateAndPopulate(
+      ITaskConfig config,
+      int instanceCount) throws TaskDescriptionException {
+
     TaskConfig builder = config.newBuilder();
 
     if (config.isSetTier() && !UserProvidedStrings.isGoodIdentifier(config.getTier())) {
@@ -373,6 +470,8 @@ public class ConfigurationManager {
         throw new TaskDescriptionException(NO_CONTAINER_VOLUMES);
       }
     }
+
+    validateSlaPolicy(builder, instanceCount);
 
     maybeFillLinks(builder);
 

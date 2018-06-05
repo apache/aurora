@@ -33,10 +33,15 @@ _curl() { curl --silent --fail --retry 4 --retry-delay 10 "$@" ; }
 tear_down() {
   set +x  # Disable command echo, as this makes it more difficult see which command failed.
 
-  for job in http_example http_example_watch_secs http_example_revocable http_example_docker http_example_unified_appc http_example_unified_docker; do
-    aurora update abort devcluster/vagrant/test/$job >/dev/null 2>&1 || true
-    aurora job killall --no-batching devcluster/vagrant/test/$job >/dev/null 2>&1
+  local _jobs=$(aurora job list $TEST_CLUSTER/$TEST_ROLE| grep $TEST_ROLE)
+
+  for job in ${_jobs[@]}; do
+    aurora update abort $job >/dev/null 2>&1 || true
+    aurora job killall --no-batching $job >/dev/null 2>&1
   done
+
+  aurora_admin set_quota $TEST_CLUSTER $TEST_ROLE 0 0m 0m
+  aurora_admin host_activate --hosts=$TEST_SLAVE_IP $TEST_CLUSTER
 
   sudo mv /etc/aurora/clusters.json.old /etc/aurora/clusters.json >/dev/null 2>&1 || true
 }
@@ -241,12 +246,50 @@ wait_until_task_status() {
       _success=1
       break
     else
-      sleep 1
+      sleep 20
     fi
   done
 
   if [[ "$_success" -ne "1" ]]; then
-    echo "Task did not transition to $_expected_state within two minutes."
+    echo "Task did not transition to $_expected_state within timeout."
+    exit 1
+  fi
+}
+
+assert_host_status() {
+  local _host=$1 _cluster=$2 _expected_state=$3
+
+  local _state=$(aurora_admin host_status --hosts=$_host $_cluster 2>&1 | tail -n1 | awk -F' ' '{print $6}')
+
+  if [[ $_state != $_expected_state ]]; then
+    echo "Expected host $_host to be in state $_expected_state, but found $_state"
+    exit 1
+  fi
+}
+
+wait_until_task_counts() {
+  # Poll the job, waiting for it to enter the target number of task counts
+  local _jobkey=$1 _expected_running=$2 _expected_pending=$3
+  local _num_running=0
+  local _num_pending=0
+  local _success=0
+
+  for i in $(seq 1 120); do
+    # || is so that we don't return an EXIT so that `trap collect_result` doesn't get triggered.
+    _num_running=$(aurora job status $_jobkey --write-json | jq -r ".[0].active[].status" | grep "RUNNING" | wc -l) || echo $?
+    _num_pending=$(aurora job status $_jobkey --write-json | jq -r ".[0].active[].status" | grep "PENDING" | wc -l) || echo $?
+
+    if [[ $_num_running == $_expected_running ]] && [[ $_num_pending == $_expected_pending ]]; then
+      _success=1
+      break
+    else
+      echo "Waiting for job $_jobkey to have $_expected_running RUNNING and $_expected_pending PENDING tasks."
+      sleep 20
+    fi
+  done
+
+  if [[ "$_success" -ne "1" ]]; then
+    echo "Job $_jobkey did not have $_expected_running RUNNING tasks and $_expected_pending PENDING tasks within timeout."
     exit 1
   fi
 }
@@ -339,6 +382,73 @@ test_partition_awareness() {
   aurora job killall $_default_jobkey
   aurora job killall $_disabled_jobkey
   aurora job killall $_delay_jobkey
+}
+
+run_sla_aware_maintenance() {
+  local _config=$1
+  local _cluster=$2
+  local _jobkey=$3
+
+  aurora job create $_jobkey $_config --wait-until RUNNING
+
+  # assert the number of tasks, the job should have 2 RUNNING tasks
+  wait_until_task_counts $_jobkey 2 0
+
+  # check that the host starts with no maintenance mode
+  assert_host_status $TEST_SLAVE_IP $_cluster "NONE"
+
+  # trigger sla aware drain with default timeout of 2hr
+  # so, only allowed number (1 each) of tasks should drain for each job
+  aurora_admin sla_host_drain --hosts=$TEST_SLAVE_IP $_cluster
+
+  # force a scheduler restart and make sure that the maintenance request is still satisfied
+  sudo systemctl restart aurora-scheduler
+
+  # host must have maintenance mode set
+  assert_host_status $TEST_SLAVE_IP $_cluster "DRAINING"
+
+  # tasks get drained as allowed by the sla policy
+  wait_until_task_counts $_jobkey 1 1
+
+  # for coordinator sla check specific task states
+  if [[ $_jobkey == $TEST_JOB_COORDINATOR_SLA ]]; then
+    assert_task_status $_jobkey "0" PENDING
+    assert_task_status $_jobkey "1" RUNNING
+  fi
+
+  # host must have maintenance mode set and should be waiting in DRAINING
+  assert_host_status $TEST_SLAVE_IP $_cluster "DRAINING"
+
+  # force sla aware drain with zero timeout
+  aurora_admin sla_host_drain --force_drain_timeout=0s --hosts=$TEST_SLAVE_IP $_cluster
+
+  # tasks get drained as allowed by the sla policy
+  wait_until_task_counts $_jobkey 0 2
+
+  # activate host again
+  aurora_admin host_activate --hosts=$TEST_SLAVE_IP $_cluster
+
+  # assert the number of tasks the job should have 2 RUNNING tasks
+  wait_until_task_counts $_jobkey 2 0
+
+  # clean up
+  aurora job killall $_jobkey
+}
+
+test_sla_aware_maintenance() {
+  local _config=$1
+  local _cluster=$2
+  local _role=$3
+  local _count_jobkey=$4
+  local _percentage_jobkey=$5
+  local _coordinator_jobkey=$6
+
+  # add quota for each job (addl. for executor overhead) since only preferred jobs get sla policy
+  aurora_admin increase_quota $_cluster $_role 1.0 10m 50m
+
+  run_sla_aware_maintenance $_config $_cluster $_count_jobkey
+  run_sla_aware_maintenance $_config $_cluster $_percentage_jobkey
+  run_sla_aware_maintenance $_config $_cluster $_coordinator_jobkey
 }
 
 test_announce() {
@@ -744,6 +854,10 @@ TEST_PARTITION_AWARENESS_CONFIG_FILE=$TEST_ROOT/partition_aware.aurora
 TEST_JOB_PA_DEFAULT=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/partition_aware_default
 TEST_JOB_PA_DISABLED=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/partition_aware_disabled
 TEST_JOB_PA_DELAY=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/partition_aware_delay
+TEST_SLA_POLICY_CONFIG_FILE=$TEST_ROOT/sla_policy.aurora
+TEST_JOB_COUNT_SLA=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/count
+TEST_JOB_PERCENTAGE_SLA=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/percentage
+TEST_JOB_COORDINATOR_SLA=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/coordinator
 
 BASE_ARGS=(
   $TEST_CLUSTER
@@ -792,6 +906,15 @@ TEST_PARTITION_AWARENESS_ARGS=(
   $TEST_JOB_PA_DELAY
 )
 
+TEST_SLA_AWARE_MAINTENANCE_ARGS=(
+  $TEST_SLA_POLICY_CONFIG_FILE
+  $TEST_CLUSTER
+  $TEST_ROLE
+  $TEST_JOB_COUNT_SLA
+  $TEST_JOB_PERCENTAGE_SLA
+  $TEST_JOB_COORDINATOR_SLA
+)
+
 TEST_JOB_KILL_MESSAGE_ARGS=("${TEST_JOB_ARGS[@]}" "--message='Test message'")
 
 trap collect_result EXIT
@@ -799,6 +922,8 @@ trap collect_result EXIT
 aurorabuild all
 setup_ssh
 setup_docker_registry
+
+test_sla_aware_maintenance "${TEST_SLA_AWARE_MAINTENANCE_ARGS[@]}"
 
 test_partition_awareness "${TEST_PARTITION_AWARENESS_ARGS[@]}"
 

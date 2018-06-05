@@ -170,6 +170,7 @@ class HostMaintenance(object):
     for hostname in drained_hosts:
       callback(hostname)
 
+  # Deprecated: See AURORA-1986.
   def perform_maintenance(self, hostnames, grouping_function=DEFAULT_GROUPING,
                           percentage=None, duration=None, output_file=None, callback=None):
     """Put hosts into maintenance mode and drain them.
@@ -233,6 +234,25 @@ class HostMaintenance(object):
           log.error('Failed to write into the output file: %s' % e)
 
     return set(hostnames) - not_drained_hostnames
+
+  def perform_sla_maintenance(self, hostnames, percentage, duration, timeout):
+    """Submits hosts for SLA-aware to the scheduler.
+
+
+    :param hostnames: A list of hostnames to operate upon
+    :type hostnames: list of strings
+    :param percentage: SLA percentage to use
+    :type percentage: float
+    :param duration: SLA duration to use
+    :type duration: twitter.common.quantity.Time
+    :param timeout: Force drain timeout
+    :type duration: twitter.common.quantity.Time
+    :rtype: set of host names that were successfully drained
+    """
+    drainable_hosts = Hosts(set(hostnames))
+    check_and_log_response(
+      self._client.sla_drain_hosts(drainable_hosts, percentage, duration, timeout))
+    return drainable_hosts
 
   def check_status(self, hostnames):
     """Query the scheduler to determine the maintenance status for a list of hostnames

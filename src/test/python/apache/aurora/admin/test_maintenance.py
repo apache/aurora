@@ -18,7 +18,13 @@ from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
-from apache.aurora.admin.maintenance import host_activate, host_deactivate, host_drain, host_status
+from apache.aurora.admin.maintenance import (
+    host_activate,
+    host_deactivate,
+    host_drain,
+    host_status,
+    sla_host_drain
+)
 
 from .util import AuroraClientCommandTest
 
@@ -29,12 +35,15 @@ from gen.apache.aurora.api.ttypes import (
     HostStatus,
     MaintenanceMode,
     MaintenanceStatusResult,
+    PercentageSlaPolicy,
+    SlaPolicy,
     StartMaintenanceResult
 )
 
 
 class TestMaintenanceCommands(AuroraClientCommandTest):
   HOSTNAMES = ['us-grf-20', 'us-jim-47', 'us-suz-01']
+  DEFAULT_SLA_PERCENTAGE = 95
 
   def make_mock_options(self):
     mock_options = Mock()
@@ -46,6 +55,9 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_options.percentage = None
     mock_options.duration = None
     mock_options.reason = None
+    mock_options.default_duration = '30m'
+    mock_options.default_percentage = self.DEFAULT_SLA_PERCENTAGE
+    mock_options.timeout = '2h'
     return mock_options
 
   def create_host_statuses(self, maintenance_mode, skip_hosts=None):
@@ -127,9 +139,9 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
     mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
     mock_vector = self.create_mock_probe_hosts_vector([
-        self.create_probe_hosts(self.HOSTNAMES[0], 95, True, None),
-        self.create_probe_hosts(self.HOSTNAMES[1], 95, True, None),
-        self.create_probe_hosts(self.HOSTNAMES[2], 95, True, None)
+        self.create_probe_hosts(self.HOSTNAMES[0], self.DEFAULT_SLA_PERCENTAGE, True, None),
+        self.create_probe_hosts(self.HOSTNAMES[1], self.DEFAULT_SLA_PERCENTAGE, True, None),
+        self.create_probe_hosts(self.HOSTNAMES[2], self.DEFAULT_SLA_PERCENTAGE, True, None)
     ])
 
     with contextlib.nested(
@@ -163,9 +175,9 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         skip_hosts=['us-grf-20'])
     mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
     mock_vector = self.create_mock_probe_hosts_vector([
-      self.create_probe_hosts(self.HOSTNAMES[0], 95, True, None),
-      self.create_probe_hosts(self.HOSTNAMES[1], 95, True, None),
-      self.create_probe_hosts(self.HOSTNAMES[2], 95, True, None)
+      self.create_probe_hosts(self.HOSTNAMES[0], self.DEFAULT_SLA_PERCENTAGE, True, None),
+      self.create_probe_hosts(self.HOSTNAMES[1], self.DEFAULT_SLA_PERCENTAGE, True, None),
+      self.create_probe_hosts(self.HOSTNAMES[2], self.DEFAULT_SLA_PERCENTAGE, True, None)
     ])
 
     with contextlib.nested(
@@ -192,9 +204,9 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
       mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
       mock_vector = self.create_mock_probe_hosts_vector([
-          self.create_probe_hosts(self.HOSTNAMES[0], 95, False, None),
-          self.create_probe_hosts(self.HOSTNAMES[1], 95, False, None),
-          self.create_probe_hosts(self.HOSTNAMES[2], 95, False, None)
+          self.create_probe_hosts(self.HOSTNAMES[0], self.DEFAULT_SLA_PERCENTAGE, False, None),
+          self.create_probe_hosts(self.HOSTNAMES[1], self.DEFAULT_SLA_PERCENTAGE, False, None),
+          self.create_probe_hosts(self.HOSTNAMES[2], self.DEFAULT_SLA_PERCENTAGE, False, None)
       ])
 
       with contextlib.nested(
@@ -222,9 +234,9 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
       mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
       mock_vector = self.create_mock_probe_hosts_vector([
-          self.create_probe_hosts(self.HOSTNAMES[0], 95, False, None),
-          self.create_probe_hosts(self.HOSTNAMES[1], 95, False, None),
-          self.create_probe_hosts(self.HOSTNAMES[2], 95, False, None)
+          self.create_probe_hosts(self.HOSTNAMES[0], self.DEFAULT_SLA_PERCENTAGE, False, None),
+          self.create_probe_hosts(self.HOSTNAMES[1], self.DEFAULT_SLA_PERCENTAGE, False, None),
+          self.create_probe_hosts(self.HOSTNAMES[2], self.DEFAULT_SLA_PERCENTAGE, False, None)
       ])
       mock_wait = Mock()
 
@@ -326,3 +338,46 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       mock_scheduler_proxy.maintenanceStatus.assert_called_with(
         Hosts(set(self.HOSTNAMES)),
         retry=True)
+
+  def test_perform_sla_maintenance_hosts(self):
+    mock_options = self.make_mock_options()
+
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
+    mock_scheduler_proxy.slaDrainHosts.return_value = self.create_start_maintenance_result()
+
+    with contextlib.nested(
+      patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+      patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+      patch('twitter.common.app.get_options', return_value=mock_options)):
+      sla_host_drain([self.TEST_CLUSTER])
+
+      mock_scheduler_proxy.slaDrainHosts.assert_called_with(
+        Hosts(set(self.HOSTNAMES)),
+        SlaPolicy(percentageSlaPolicy=PercentageSlaPolicy(
+          percentage=self.DEFAULT_SLA_PERCENTAGE,
+          durationSecs=1800)),
+        7200)
+      assert mock_scheduler_proxy.slaDrainHosts.call_count == 1
+
+  def test_perform_sla_maintenance_hosts_defaults(self):
+    mock_options = self.make_mock_options()
+    mock_options.default_percentage = self.DEFAULT_SLA_PERCENTAGE
+    mock_options.default_duration = '2m'
+    mock_options.timeout = '10m'
+
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
+    mock_scheduler_proxy.slaDrainHosts.return_value = self.create_start_maintenance_result()
+
+    with contextlib.nested(
+      patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+      patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+      patch('twitter.common.app.get_options', return_value=mock_options)):
+      sla_host_drain([self.TEST_CLUSTER])
+
+      mock_scheduler_proxy.slaDrainHosts.assert_called_with(
+        Hosts(set(self.HOSTNAMES)),
+        SlaPolicy(percentageSlaPolicy=PercentageSlaPolicy(
+          percentage=self.DEFAULT_SLA_PERCENTAGE,
+          durationSecs=120)),
+        600)
+      assert mock_scheduler_proxy.slaDrainHosts.call_count == 1

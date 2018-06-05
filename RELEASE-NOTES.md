@@ -1,3 +1,35 @@
+0.21.0
+======
+
+### New/updated:
+- Introduce ability for tasks to specify custom SLA requirements via the new `SlaPolicy` structs.
+  There are 3 different SLA Policies that are currently supported - `CountSlaPolicy`,
+  `PercentageSlaPolicy` and `CoordinatorSlaPolicy`. SLA policies based on count and percentage
+  express the required number of `RUNNING` instances as either a count or percentage in addition to
+  allowing the duration-window for which these requirements have to be satisfied. For applications
+  that need more control over how SLA is determined, a custom SLA calculator can be configured a.k.a
+  Coordinator. Any action that can affect SLA, will first check with the Coordinator before
+  proceeding.
+
+    **IMPORTANT: The storage changes required for this feature will make scheduler
+    snapshot backwards incompatible. Scheduler will be unable to read snapshot if rolled back to
+    previous version. If rollback is absolutely necessary, perform the following steps:**
+    1. Stop all host maintenance requests via `aurora_admin host_activate`.
+    2. Ensure a new snapshot is created by running `aurora_admin scheduler_snapshot <cluster>`
+    3. Rollback to previous version
+
+  Note: The `Coordinator` interface required for the `CoordinatorSlaPolicy` is experimental at
+  this juncture and is bound to change in the future.
+
+### Deprecations and removals:
+
+- Deprecated the `aurora_admin host_drain` command used for maintenance. With this release the SLA
+  computations are moved to the scheduler and it is no longer required for the client to compute
+  SLAs and watch the drains. The scheduler persists any host maintenance request and performs
+  SLA-aware drain of the tasks, before marking the host as `DRAINED`. So maintenance requests
+  survive across scheduler fail-overs. Use the newly introduced `aurora_admin sla_host_drain`
+  to skip the SLA computations on the admin client.
+
 0.20.0
 ======
 

@@ -18,7 +18,6 @@ import java.lang.annotation.Target;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
@@ -30,6 +29,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
+import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
@@ -39,6 +39,9 @@ import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.PositiveAmount;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory;
+import org.asynchttpclient.AsyncHttpClient;
+import org.asynchttpclient.DefaultAsyncHttpClientConfig;
+import org.asynchttpclient.channel.DefaultKeepAliveStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +54,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.JOB_UPTIMES;
 import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.MEDIANS;
 import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.PLATFORM_UPTIME;
+import static org.asynchttpclient.Dsl.asyncHttpClient;
 
 /**
  * Binding module for the sla processor.
@@ -76,6 +80,27 @@ public class SlaModule extends AbstractModule {
         description = "Metric categories collected for non production tasks.",
         splitter = CommaSplitter.class)
     public List<MetricCategory> slaNonProdMetrics = ImmutableList.of();
+
+    @Parameter(names = "-sla_coordinator_timeout",
+        validateValueWith = PositiveAmount.class,
+        description = "Timeout interval for communicating with Coordinator.")
+    public TimeAmount slaCoordinatorTimeout = new TimeAmount(1, Time.MINUTES);
+
+    @Parameter(names = "-max_parallel_coordinated_maintenance",
+        description = "Maximum number of coordinators that can be contacted in parallel.")
+    public Integer maxParallelCoordinators = 10;
+
+    @Parameter(names = "-min_required_instances_for_sla_check",
+        description = "Minimum number of instances required for a job to be eligible for SLA "
+            + "check. This does not apply to jobs that have a CoordinatorSlaPolicy.")
+    public Integer minRequiredInstances = 20;
+
+    @Parameter(names = "-max_sla_duration_secs",
+        validateValueWith = PositiveAmount.class,
+        description = "Maximum duration window for which SLA requirements are to be satisfied."
+            + "This does not apply to jobs that have a CoordinatorSlaPolicy."
+    )
+    public TimeAmount maxSlaDuration = new TimeAmount(2, Time.HOURS);
   }
 
   @VisibleForTesting
@@ -104,6 +129,36 @@ public class SlaModule extends AbstractModule {
 
     bind(SlaUpdater.class).in(Singleton.class);
     SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(SlaUpdater.class);
+
+    DefaultAsyncHttpClientConfig config = new DefaultAsyncHttpClientConfig.Builder()
+        .setConnectTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
+        .setHandshakeTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
+        .setSslSessionTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
+        .setReadTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
+        .setRequestTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
+        .setKeepAliveStrategy(new DefaultKeepAliveStrategy())
+        .build();
+    AsyncHttpClient httpClient = asyncHttpClient(config);
+
+    bind(AsyncHttpClient.class)
+        .annotatedWith(SlaManager.HttpClient.class)
+        .toInstance(httpClient);
+
+    bind(new TypeLiteral<Integer>() { })
+        .annotatedWith(SlaManager.MinRequiredInstances.class)
+        .toInstance(options.minRequiredInstances);
+
+    bind(new TypeLiteral<Integer>() { })
+        .annotatedWith(SlaManager.MaxParallelCoordinators.class)
+        .toInstance(options.maxParallelCoordinators);
+
+    bind(ScheduledExecutorService.class)
+        .annotatedWith(SlaManager.SlaManagerExecutor.class)
+        .toInstance(AsyncUtil.loggingScheduledExecutor(
+            options.maxParallelCoordinators,
+            "SlaManager-%d", LOG));
+
+    bind(SlaManager.class).in(javax.inject.Singleton.class);
   }
 
   // TODO(ksweeney): This should use AbstractScheduledService.

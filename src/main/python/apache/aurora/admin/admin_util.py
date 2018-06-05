@@ -100,6 +100,29 @@ OVERRIDE_SLA_REASON_OPTION = optparse.Option(
     help='Reason for overriding default SLA values. Provide details including the '
          'maintenance ticket number.')
 
+DEFAULT_SLA_PERCENTAGE_OPTION = optparse.Option(
+    '--default_percentage',
+    dest='default_percentage',
+    default=95,
+    help='Percentage of tasks required to be up all the time within the duration. '
+         'This percentage will be used for SLA calculation if tasks do not '
+         'have a configured SlaPolicy.')
+
+DEFAULT_SLA_DURATION_OPTION = optparse.Option(
+    '--default_duration',
+    dest='default_duration',
+    default='30m',
+    help='Time interval (now - value) for the percentage of up tasks. Format: XdYhZmWs. '
+         'This duration will be used for SLA calculation if tasks do not '
+         'have a configured SlaPolicy.')
+
+FORCE_DRAIN_TIMEOUT_OPTION = optparse.Option(
+    '--force_drain_timeout',
+    dest='timeout',
+    default='7d',
+    help='Time interval (now - value) after which tasks will be forcefully drained. '
+         'Format: XdYhZmWs.')
+
 UNSAFE_SLA_HOSTS_FILE_OPTION = optparse.Option(
     '--unsafe_hosts_file',
     dest='unsafe_hosts_filename',
@@ -213,6 +236,7 @@ def parse_and_validate_sla_overrides(options, hostnames):
   if has_override != all_overrides:
     die('All --override_* options are required when attempting to override default SLA values.')
 
+  print(options.percentage)
   percentage = parse_sla_percentage(options.percentage) if options.percentage else None
   duration = parse_time(options.duration) if options.duration else None
   if options.reason:
@@ -228,6 +252,20 @@ def parse_and_validate_sla_overrides(options, hostnames):
         options.reason))
 
   return percentage or SLA_UPTIME_PERCENTAGE_LIMIT, duration or SLA_UPTIME_DURATION_LIMIT
+
+
+def parse_and_validate_sla_drain_default(options):
+  """Parses and validates host SLA default 3-tuple (percentage, duration, timeout).
+
+  :param options: command line options
+  :type options: list of app.option
+  :rtype: a tuple of: default percentage (float), default duration (Amount) and timeout (Amount)
+  """
+  percentage = parse_sla_percentage(options.default_percentage)
+  duration = parse_time(options.default_duration).as_(Time.SECONDS)
+  timeout = parse_time(options.timeout).as_(Time.SECONDS)
+
+  return percentage, duration, timeout
 
 
 def print_results(results):

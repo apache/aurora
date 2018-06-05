@@ -30,17 +30,21 @@ import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
+import org.apache.aurora.gen.ServerInfo;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.sla.SlaModule.SlaUpdater;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.TIER_MANAGER;
 import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.JOB_UPTIMES;
 import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.MEDIANS;
 import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.PLATFORM_UPTIME;
@@ -50,6 +54,9 @@ import static org.junit.Assert.assertNotNull;
 
 public class SlaModuleTest extends EasyMockTest {
 
+  private static final String CLUSTER_NAME = "test_cluster";
+  private static final String STATS_URL_PREFIX = "fake_url";
+
   private Injector injector;
   private FakeClock clock;
   private StorageTestUtil storageUtil;
@@ -57,7 +64,7 @@ public class SlaModuleTest extends EasyMockTest {
   private SlaModule module;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     storageUtil = new StorageTestUtil(this);
     clock = new FakeClock();
     statsProvider = createMock(StatsProvider.class);
@@ -76,6 +83,12 @@ public class SlaModuleTest extends EasyMockTest {
                 bind(Clock.class).toInstance(clock);
                 bind(Storage.class).toInstance(storageUtil.storage);
                 bind(StatsProvider.class).toInstance(statsProvider);
+                bind(TierManager.class).toInstance(TIER_MANAGER);
+                bind(IServerInfo.class).toInstance(
+                    IServerInfo.build(
+                        new ServerInfo()
+                            .setClusterName(CLUSTER_NAME)
+                            .setStatsUrlPrefix(STATS_URL_PREFIX)));
               }
             }).build()
     );

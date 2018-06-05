@@ -1244,6 +1244,12 @@ service AuroraAdmin extends AuroraSchedulerManager {
   /** Set the given hosts back into serving mode. */
   Response endMaintenance(1: Hosts hosts)
 
+  /**
+   * Ask scheduler to put hosts into DRAINING mode and move scheduled tasks off of the hosts
+   * such that its SLA requirements are satisfied. Use defaultSlaPolicy if it is not set for a task.
+   **/
+  Response slaDrainHosts(1: Hosts hosts, 2: SlaPolicy defaultSlaPolicy, 3: i64 timeoutSecs)
+
   /** Start a storage snapshot and block until it completes. */
   Response snapshot()
 

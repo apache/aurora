@@ -354,9 +354,13 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   public Response getJobUpdateDiff(JobUpdateRequest mutableRequest) {
     IJobUpdateRequest request;
     try {
-      request = IJobUpdateRequest.build(new JobUpdateRequest(mutableRequest).setTaskConfig(
-          configurationManager.validateAndPopulate(
-              ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
+      request = IJobUpdateRequest.build(
+          new JobUpdateRequest(mutableRequest)
+              .setTaskConfig(configurationManager
+                  .validateAndPopulate(
+                      ITaskConfig.build(mutableRequest.getTaskConfig()),
+                      mutableRequest.getInstanceCount())
+                  .newBuilder()));
     } catch (TaskDescriptionException e) {
       return error(INVALID_REQUEST, e);
     }
