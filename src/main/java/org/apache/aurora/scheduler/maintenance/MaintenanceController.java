@@ -256,6 +256,7 @@ public interface MaintenanceController {
             if (Iterables.isEmpty(activeTasks)) {
               LOG.info("Moving host {} into DRAINED", host);
               setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
+              store.getHostMaintenanceStore().removeHostMaintenanceRequest(host);
             } else {
               LOG.info("Host {} is DRAINING with active tasks: {}", host, Tasks.ids(activeTasks));
             }

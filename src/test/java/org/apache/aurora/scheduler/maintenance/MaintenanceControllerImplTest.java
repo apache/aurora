@@ -190,6 +190,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expectMaintenanceModeChange(HOST_A, DRAINED);
     expectMaintenanceModeChange(HOST_A, NONE);
     storageUtil.hostMaintenanceStore.removeHostMaintenanceRequest(HOST_A);
+    // end maintenance
+    storageUtil.hostMaintenanceStore.removeHostMaintenanceRequest(HOST_A);
 
     control.replay();
 
