@@ -25,9 +25,7 @@ date
 
 # Run remaining Python style checks and all tests
 ./build-support/python/checkstyle-check
-# AURORA-1972: As a workaround for spuriously failing tests, test different
-# targets in isolation
-./pants test.pytest --no-test-pytest-fast src/test/python:: -- -v
+./pants --cache-ignore test.pytest src/test/python:: -- -v
 
 # Ensure we can build python sdists (AURORA-1174)
 ./build-support/release/make-python-sdists

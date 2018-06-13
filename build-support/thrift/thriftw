@@ -91,7 +91,7 @@ EOF
 
 thrift="$(compatible_system_thrift)"
 if [[ -z "${thrift}" ]]; then
-  readonly pants_thrift_version="$(get_pants_option thrift-binary version)"
+  readonly pants_thrift_version="$(get_pants_option thrift version)"
   if [[ "${expected_version}" != "${pants_thrift_version}" ]]; then
     echo "Pants thrift version ${pants_thrift_version} does not match expected version ${expected_version}!"
     exit 1

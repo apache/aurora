@@ -55,7 +55,10 @@ python_binary(
     # TODO(ksweeney): This violates the rule that every library export the same deps as its
     # contained binaries.
     '3rdparty/python:mesos.executor',
-  ]
+  ],
+  # The binary can only build when the native Mesos dependency has been prefetched. This tag
+  # allows us to skip this target on development machines if necessary.
+  tags=['mesos-native']
 )
 
 python_library(
