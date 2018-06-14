@@ -28,7 +28,14 @@ class MesosPathDetector(PathDetector):
     self._sandbox_path = sandbox_path
 
   def get_paths(self):
-    def iterate():
-      for scan_result in self._detector:
-        yield os.path.join(os.path.realpath(ExecutorDetector.path(scan_result)), self._sandbox_path)
-    return list(set(path for path in iterate() if os.path.exists(path)))
+    result = []
+
+    for scan_result in self._detector:
+      executor_path = ExecutorDetector.path(scan_result)
+      sandbox_path = os.path.join(executor_path, self._sandbox_path)
+
+      # We only care about the realpath of executors and not the additional `latest` link
+      if not os.path.islink(executor_path) and os.path.exists(sandbox_path):
+        result.append(sandbox_path)
+
+    return result

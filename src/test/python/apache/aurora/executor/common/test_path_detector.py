@@ -41,8 +41,8 @@ def test_path_detector():
   )
 
   with mock.patch('glob.glob', return_value=(path1_symlink, path1, path2)) as glob:
-    with mock.patch('os.path.realpath', side_effect=(path1, path1, path2)) as realpath:
-      with mock.patch('os.path.exists', side_effect=(True, True, False)) as exists:
+    with mock.patch('os.path.islink', side_effect=(True, False, False)) as islink:
+      with mock.patch('os.path.exists', side_effect=(True, False)) as exists:
         mpd = MesosPathDetector(root=FAKE_ROOT, sandbox_path=FAKE_CHECKPOINT_DIR)
         paths = list(mpd.get_paths())
         assert len(paths) == 1
@@ -56,13 +56,12 @@ def test_path_detector():
           'run': '*'
         }
         assert glob.mock_calls == [mock.call(expected_glob_pattern)]
-        assert realpath.mock_calls == [
+        assert islink.mock_calls == [
             mock.call(os.path.join(path1_symlink)),
             mock.call(os.path.join(path1)),
             mock.call(os.path.join(path2)),
         ]
         assert exists.mock_calls == [
-            mock.call(os.path.join(path1, FAKE_CHECKPOINT_DIR)),
             mock.call(os.path.join(path1, FAKE_CHECKPOINT_DIR)),
             mock.call(os.path.join(path2, FAKE_CHECKPOINT_DIR)),
         ]
