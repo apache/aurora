@@ -33,6 +33,7 @@ from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     GetQuotaResult,
     JobKey,
+    Resource,
     ResourceAggregate,
     Response,
     ResponseCode,
@@ -194,9 +195,18 @@ class TestIncreaseQuotaCommand(AuroraClientCommandTest):
       api = mock_make_admin_client.return_value
       role = 'test_role'
       api.get_quota.return_value = self.create_response(
-          ResourceAggregate(20.0, 4000, 6000),
-          ResourceAggregate(15.0, 2000, 3000),
-          ResourceAggregate(6.0, 200, 600),
+          ResourceAggregate(resources=frozenset([
+              Resource(numCpus=20.0),
+              Resource(ramMb=4000),
+              Resource(diskMb=6000)])),
+          ResourceAggregate(resources=frozenset([
+              Resource(numCpus=15.0),
+              Resource(ramMb=2000),
+              Resource(diskMb=3000)])),
+          ResourceAggregate(resources=frozenset([
+              Resource(numCpus=6.0),
+              Resource(ramMb=200),
+              Resource(diskMb=600)])),
       )
       api.set_quota.return_value = self.create_simple_success_response()
 

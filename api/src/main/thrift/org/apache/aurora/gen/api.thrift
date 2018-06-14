@@ -320,15 +320,6 @@ struct TaskConfig {
 }
 
 struct ResourceAggregate {
-  // TODO(maxim): Deprecated. See AURORA-1707.
-  /** Number of CPU cores allotted. */
-  1: double numCpus
-  // TODO(maxim): Deprecated. See AURORA-1707.
-  /** Megabytes of RAM allotted. */
-  2: i64 ramMb
-  // TODO(maxim): Deprecated. See AURORA-1707.
-  /** Megabytes of disk space allotted. */
-  3: i64 diskMb
   /** Aggregated resource values. */
   4: set<Resource> resources
 }

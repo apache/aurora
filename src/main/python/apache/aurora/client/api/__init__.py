@@ -329,7 +329,7 @@ class AuroraClientAPI(object):
               % (role, cpu, ram, disk))
     return self._scheduler_proxy.setQuota(
         role,
-        ResourceAggregate(cpu, ram, disk, frozenset([
+        ResourceAggregate(frozenset([
             Resource(numCpus=cpu),
             Resource(ramMb=ram),
             Resource(diskMb=disk)])))

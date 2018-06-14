@@ -55,7 +55,7 @@ public final class ResourceTestUtil {
   }
 
   public static IResourceAggregate aggregate(double numCpus, long ramMb, long diskMb) {
-    return IResourceAggregate.build(new ResourceAggregate(numCpus, ramMb, diskMb, ImmutableSet.of(
+    return IResourceAggregate.build(new ResourceAggregate(ImmutableSet.of(
         numCpus(numCpus),
         ramMb(ramMb),
         diskMb(diskMb)

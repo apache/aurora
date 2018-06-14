@@ -21,7 +21,6 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
@@ -63,36 +62,6 @@ public class ThriftBackfillTest extends EasyMockTest {
     assertEquals(
         expected,
         thriftBackfill.backfillTask(config));
-  }
-
-  @Test
-  public void testResourceAggregateFieldsToSet() {
-    control.replay();
-
-    ResourceAggregate aggregate = new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64);
-
-    IResourceAggregate expected = IResourceAggregate.build(aggregate.deepCopy()
-        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64))));
-
-    assertEquals(expected, ThriftBackfill.backfillResourceAggregate(aggregate));
-  }
-
-  @Test
-  public void testResourceAggregateSetToFields() {
-    control.replay();
-
-    ResourceAggregate aggregate = new ResourceAggregate()
-        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)));
-
-    IResourceAggregate expected = IResourceAggregate.build(aggregate.deepCopy()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64));
-
-    assertEquals(expected, ThriftBackfill.backfillResourceAggregate(aggregate));
   }
 
   @Test(expected = IllegalArgumentException.class)

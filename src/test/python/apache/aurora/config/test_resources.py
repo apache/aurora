@@ -47,8 +47,11 @@ class TestResourceManager(unittest.TestCase):
         ResourceType.CPUS)
     assert quantity == 1.0
 
-  def test_backfill_quota(self):
-    quota = ResourceAggregate(numCpus=1.0, ramMb=2, diskMb=3)
+  def test_quota(self):
+    quota = ResourceAggregate(resources={
+        Resource(numCpus=1.0),
+        Resource(ramMb=2),
+        Resource(diskMb=3)})
     assert ResourceManager.resource_details_from_quota(quota) == [
         ResourceDetails(ResourceType.CPUS, 1.0),
         ResourceDetails(ResourceType.RAM_MB, 2),

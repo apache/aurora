@@ -730,13 +730,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testSetQuota() throws Exception {
     ResourceAggregate resourceAggregate = new ResourceAggregate()
-        .setNumCpus(10)
-        .setDiskMb(100)
-        .setRamMb(200);
+        .setResources(ImmutableSet.of(numCpus(10.0), ramMb(200), diskMb(100)));
     quotaManager.saveQuota(
         ROLE,
-        IResourceAggregate.build(resourceAggregate.deepCopy()
-            .setResources(ImmutableSet.of(numCpus(10), ramMb(200), diskMb(100)))),
+        IResourceAggregate.build(resourceAggregate),
         storageUtil.mutableStoreProvider);
 
     control.replay();
@@ -747,9 +744,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testSetQuotaFails() throws Exception {
     ResourceAggregate resourceAggregate = new ResourceAggregate()
-        .setNumCpus(10)
-        .setDiskMb(100)
-        .setRamMb(200);
+        .setResources(ImmutableSet.of(numCpus(10.0), ramMb(200), diskMb(100)));
     quotaManager.saveQuota(
         ROLE,
         IResourceAggregate.build(resourceAggregate.deepCopy()

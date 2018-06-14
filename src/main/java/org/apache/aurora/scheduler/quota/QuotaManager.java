@@ -48,6 +48,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IRange;
+import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -168,8 +169,12 @@ public interface QuotaManager {
         final IResourceAggregate quota,
         MutableStoreProvider storeProvider) throws QuotaException {
 
-      if (quota.getNumCpus() < 0.0 || quota.getRamMb() < 0 || quota.getDiskMb() < 0) {
-        throw new QuotaException("Negative values in: " + quota.toString());
+      for (IResource resource : quota.getResources()) {
+        if (resource.isSetNumCpus() && resource.getNumCpus() < 0.0
+            || resource.isSetRamMb() && resource.getRamMb() < 0
+            || resource.isSetDiskMb() && resource.getDiskMb() < 0) {
+          throw new QuotaException("Negative values in: " + quota.toString());
+        }
       }
 
       QuotaInfo info = getQuotaInfo(ownerRole, Optional.empty(), storeProvider);

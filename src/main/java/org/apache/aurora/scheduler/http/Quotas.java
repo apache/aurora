@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.http;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -29,9 +30,15 @@ import com.google.common.base.Function;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.codehaus.jackson.annotate.JsonProperty;
+
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Servlet that exposes allocated resource quotas.
@@ -72,7 +79,18 @@ public class Quotas {
   }
 
   private static final Function<IResourceAggregate, ResourceAggregateBean> TO_BEAN =
-      quota -> new ResourceAggregateBean(quota.getNumCpus(), quota.getRamMb(), quota.getDiskMb());
+      quota -> new ResourceAggregateBean(
+          getResource(quota.getResources(), CPUS).getNumCpus(),
+          getResource(quota.getResources(), RAM_MB).getRamMb(),
+          getResource(quota.getResources(), DISK_MB).getDiskMb());
+
+  private static IResource getResource(Set<IResource> resources, ResourceType type) {
+    return resources.stream()
+        .filter(e -> ResourceType.fromResource(e).equals(type))
+        .findFirst()
+        .orElseThrow(() ->
+            new IllegalArgumentException("Missing resource definition for " + type));
+  }
 
   private static final class ResourceAggregateBean {
     private final double cpu;

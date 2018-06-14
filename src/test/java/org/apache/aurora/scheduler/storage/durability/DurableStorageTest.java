@@ -220,16 +220,13 @@ public class DurableStorageTest extends EasyMockTest {
     builder.add(Edit.op(Op.removeTasks(removeTasks)));
     storageUtil.taskStore.deleteTasks(removeTasks.getTaskIds());
 
-    ResourceAggregate nonBackfilled = new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64);
-    SaveQuota saveQuota = new SaveQuota(JOB_KEY.getRole(), nonBackfilled);
+    ResourceAggregate resourceAggregate = new ResourceAggregate()
+        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)));
+    SaveQuota saveQuota = new SaveQuota(JOB_KEY.getRole(), resourceAggregate);
     builder.add(Edit.op(Op.saveQuota(saveQuota)));
     storageUtil.quotaStore.saveQuota(
         saveQuota.getRole(),
-        IResourceAggregate.build(nonBackfilled.deepCopy()
-            .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)))));
+        IResourceAggregate.build(resourceAggregate));
 
     builder.add(Edit.op(Op.removeQuota(new RemoveQuota(JOB_KEY.getRole()))));
     storageUtil.quotaStore.removeQuota(JOB_KEY.getRole());

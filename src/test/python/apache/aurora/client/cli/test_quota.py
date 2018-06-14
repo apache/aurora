@@ -20,7 +20,7 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.apache.aurora.api.ttypes import GetQuotaResult, ResourceAggregate, Result
+from gen.apache.aurora.api.ttypes import GetQuotaResult, Resource, ResourceAggregate, Result
 
 
 class TestGetQuotaCommand(AuroraClientCommandTest):
@@ -29,7 +29,10 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
     response.result = Result(getQuotaResult=GetQuotaResult(
-        quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
+        quota=ResourceAggregate(resources=frozenset([
+            Resource(numCpus=5),
+            Resource(ramMb=20480),
+            Resource(diskMb=40960)])),
         prodSharedConsumption=None,
         prodDedicatedConsumption=None,
         nonProdSharedConsumption=None,
@@ -42,11 +45,26 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
     response.result = Result(getQuotaResult=GetQuotaResult(
-      quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
-      prodSharedConsumption=ResourceAggregate(numCpus=1, ramMb=512, diskMb=1024),
-      prodDedicatedConsumption=ResourceAggregate(numCpus=2, ramMb=1024, diskMb=2048),
-      nonProdSharedConsumption=ResourceAggregate(numCpus=3, ramMb=2048, diskMb=4096),
-      nonProdDedicatedConsumption=ResourceAggregate(numCpus=4, ramMb=4096, diskMb=8192),
+      quota=ResourceAggregate(resources=frozenset([
+          Resource(numCpus=5),
+          Resource(ramMb=20480),
+          Resource(diskMb=40960)])),
+      prodSharedConsumption=ResourceAggregate(resources=frozenset([
+          Resource(numCpus=1),
+          Resource(ramMb=512),
+          Resource(diskMb=1024)])),
+      prodDedicatedConsumption=ResourceAggregate(resources=frozenset([
+          Resource(numCpus=2),
+          Resource(ramMb=1024),
+          Resource(diskMb=2048)])),
+      nonProdSharedConsumption=ResourceAggregate(resources=frozenset([
+          Resource(numCpus=3),
+          Resource(ramMb=2048),
+          Resource(diskMb=4096)])),
+      nonProdDedicatedConsumption=ResourceAggregate(resources=frozenset([
+          Resource(numCpus=4),
+          Resource(ramMb=4096),
+          Resource(diskMb=8192)])),
     ))
     api.get_quota.return_value = response
 
@@ -67,18 +85,22 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     assert expected_output == self._get_quota(True, ['quota', 'get', 'west/bozo'])
 
   def test_get_quota_with_no_consumption_json(self):
-    assert (json.loads('{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960}}') ==
-            json.loads(self._get_quota(False, ['quota', 'get', '--write-json', 'west/bozo'])))
+    expected_response = self._response_converter(
+        (json.loads('{"quota":{"resources":[{"diskMb":40960},{"numCpus":5},{"ramMb":20480}]}}')))
+    actual_response = self._response_converter(
+        json.loads(self._get_quota(False, ['quota', 'get', '--write-json', 'west/bozo'])))
+    assert (expected_response == actual_response)
 
   def test_get_quota_with_consumption_json(self):
-    expected_response = json.loads(
-        '{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960},'
-        '"prodSharedConsumption":{"numCpus":1,"ramMb":512,"diskMb":1024},'
-        '"prodDedicatedConsumption":{"numCpus":2,"ramMb":1024,"diskMb":2048},'
-        '"nonProdSharedConsumption":{"numCpus":3,"ramMb":2048,"diskMb":4096},'
-        '"nonProdDedicatedConsumption":{"numCpus":4,"ramMb":4096,"diskMb":8192}}')
-    assert (expected_response ==
-            json.loads(self._get_quota(True, ['quota', 'get', '--write-json', 'west/bozo'])))
+    expected_response = self._response_converter(json.loads(
+        '{"quota":{"resources":[{"numCpus":5},{"ramMb":20480},{"diskMb":40960}]},'
+        '"prodSharedConsumption":{"resources":[{"numCpus":1},{"ramMb":512},{"diskMb":1024}]},'
+        '"prodDedicatedConsumption":{"resources":[{"numCpus":2},{"ramMb":1024},{"diskMb":2048}]},'
+        '"nonProdSharedConsumption":{"resources":[{"numCpus":3},{"ramMb":2048},{"diskMb":4096}]},'
+        '"nonProdDedicatedConsumption":{"resources":'
+        '[{"numCpus":4},{"ramMb":4096},{"diskMb":8192}]}}'))
+    assert (expected_response == self._response_converter(
+      json.loads(self._get_quota(True, ['quota', 'get', '--write-json', 'west/bozo']))))
 
   def test_get_quota_failed(self):
     fake_context = FakeAuroraCommandContext()
@@ -104,3 +126,13 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
       cmd.execute(command_args)
       out = '\n'.join(mock_context.get_out())
       return out
+
+  def _response_converter(self, response):
+    resources_list = []
+    for key in response:
+      if 'resources' in response[key] and response[key]['resources'] is not None:
+        for resource in response[key]['resources']:
+          resources_list += resource.items()
+      response[key]['resources'] = sorted(resources_list, key=lambda x: (x[0], x[1]))
+      resources_list = []
+    return response

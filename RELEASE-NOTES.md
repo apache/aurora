@@ -29,6 +29,7 @@
   SLA-aware drain of the tasks, before marking the host as `DRAINED`. So maintenance requests
   survive across scheduler fail-overs. Use the newly introduced `aurora_admin sla_host_drain`
   to skip the SLA computations on the admin client.
+- Removed resource fields (`numCpus`, `ramMb`, `diskMb`) from ResourceAggregate.
 
 0.20.0
 ======
