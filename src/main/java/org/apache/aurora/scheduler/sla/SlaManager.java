@@ -30,6 +30,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Striped;
 import com.google.gson.Gson;
 import com.google.inject.Inject;
@@ -71,8 +72,9 @@ import static java.util.Objects.requireNonNull;
  * Provides methods for performing SLA-safe work. It is used for maintenance and job update
  * operations to guarantee that a job's SLA requirements are always satisfied.
  */
-public class SlaManager {
+public class SlaManager extends AbstractIdleService {
   private static final Logger LOG = LoggerFactory.getLogger(SlaManager.class);
+
   @VisibleForTesting
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
@@ -433,5 +435,16 @@ public class SlaManager {
       return numActive < minRequiredInstances;
     }
     return true;
+  }
+
+  @Override
+  protected void startUp() {
+    //no-op
+  }
+
+  @Override
+  protected void shutDown() throws Exception {
+    LOG.info("Shutting down SlaManager async http client.");
+    httpClient.close();
   }
 }

@@ -131,6 +131,7 @@ public class SlaModule extends AbstractModule {
     SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(SlaUpdater.class);
 
     DefaultAsyncHttpClientConfig config = new DefaultAsyncHttpClientConfig.Builder()
+        .setThreadPoolName("SlaManager-AsyncHttpClient")
         .setConnectTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
         .setHandshakeTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
         .setSslSessionTimeout(options.slaCoordinatorTimeout.as(Time.MILLISECONDS).intValue())
@@ -159,6 +160,7 @@ public class SlaModule extends AbstractModule {
             "SlaManager-%d", LOG));
 
     bind(SlaManager.class).in(javax.inject.Singleton.class);
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(SlaManager.class);
   }
 
   // TODO(ksweeney): This should use AbstractScheduledService.

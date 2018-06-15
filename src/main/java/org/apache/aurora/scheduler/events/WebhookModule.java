@@ -80,6 +80,7 @@ public class WebhookModule extends AbstractModule {
     if (webhookConfig.isPresent()) {
       WebhookInfo webhookInfo = parseWebhookConfig(webhookConfig.get());
       DefaultAsyncHttpClientConfig config = new DefaultAsyncHttpClientConfig.Builder()
+          .setThreadPoolName("WebHook-AsyncHttpClient")
           .setConnectTimeout(webhookInfo.getConnectonTimeoutMsec())
           .setHandshakeTimeout(webhookInfo.getConnectonTimeoutMsec())
           .setSslSessionTimeout(webhookInfo.getConnectonTimeoutMsec())
