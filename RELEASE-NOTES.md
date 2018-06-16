@@ -2,6 +2,7 @@
 ======
 
 ### New/updated:
+- Updated to Mesos 1.5.0.
 - Introduce ability for tasks to specify custom SLA requirements via the new `SlaPolicy` structs.
   There are 3 different SLA Policies that are currently supported - `CountSlaPolicy`,
   `PercentageSlaPolicy` and `CoordinatorSlaPolicy`. SLA policies based on count and percentage

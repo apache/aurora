@@ -1,6 +1,6 @@
 {
   "variables": {
-    "base_box_ovf": "{{env `UBUNTU_OVF`}}",
+    "base_box_ovf": "{{env `UBUNTU_OVF`}}"
   },
   "builders": [{
     "type": "virtualbox-ovf",
