@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-
+import java.util.stream.StreamSupport;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -28,7 +28,6 @@ import com.google.common.base.Supplier;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -114,6 +113,11 @@ public class TaskVars extends AbstractIdleService implements EventSubscriber {
   }
 
   @VisibleForTesting
+  static String dedicatedRoleStatName(String role) {
+    return "tasks_lost_dedicated_" + role.replace("*", "_");
+  }
+
+  @VisibleForTesting
   static String jobStatName(IScheduledTask task, ScheduleStatus status) {
     return String.format(
         "tasks_%s_%s",
@@ -144,20 +148,18 @@ public class TaskVars extends AbstractIdleService implements EventSubscriber {
     if (Strings.isNullOrEmpty(task.getAssignedTask().getSlaveHost())) {
       rack = Optional.empty();
     } else {
-      rack = storage.read(storeProvider -> {
-        Optional<IAttribute> rack1 = FluentIterable
-            .from(AttributeStore.Util.attributesOrNone(storeProvider, host))
-            .firstMatch(IS_RACK)
-            .toJavaUtil();
-        return rack1.map(ATTR_VALUE);
-      });
+      rack = storage.read(storeProvider ->
+          StreamSupport.stream(
+              AttributeStore.Util.attributesOrNone(storeProvider, host).spliterator(),
+              false)
+            .filter(IS_RACK)
+            .findFirst()
+            .map(ATTR_VALUE));
     }
 
     // Always dummy-read the lost-tasks-per-rack stat. This ensures that there is at least a zero
     // exported for all racks.
-    if (rack.isPresent()) {
-      counters.getUnchecked(rackStatName(rack.get()));
-    }
+    rack.ifPresent(s -> counters.getUnchecked(rackStatName(s)));
 
     if (newState == ScheduleStatus.LOST) {
       if (rack.isPresent()) {
@@ -165,6 +167,32 @@ public class TaskVars extends AbstractIdleService implements EventSubscriber {
       } else {
         LOG.warn("Failed to find rack attribute associated with host " + host);
       }
+    }
+  }
+
+  private void updateDedicatedCounters(IScheduledTask task, ScheduleStatus newState) {
+    final String host = task.getAssignedTask().getSlaveHost();
+    ImmutableSet<String> dedicatedRoles;
+    if (Strings.isNullOrEmpty(host)) {
+      dedicatedRoles = ImmutableSet.of();
+    } else {
+      dedicatedRoles = storage.read(store ->
+          StreamSupport.stream(
+                AttributeStore.Util.attributesOrNone(store, host).spliterator(),
+                false)
+              .filter(attr -> "dedicated".equals(attr.getName()))
+              .findFirst()
+              .map(IAttribute::getValues)
+              .orElse(ImmutableSet.of())
+      );
+    }
+
+    // Always dummy-read the lost-tasks-per-role stat. This ensures that there is at least a zero
+    // exported for all roles.
+    dedicatedRoles.forEach(s -> counters.getUnchecked(dedicatedRoleStatName(s)));
+
+    if (newState == ScheduleStatus.LOST) {
+      dedicatedRoles.forEach(s -> counters.getUnchecked(dedicatedRoleStatName(s)).increment());
     }
   }
 
@@ -186,6 +214,7 @@ public class TaskVars extends AbstractIdleService implements EventSubscriber {
 
     updateRackCounters(task, task.getStatus());
     updateJobCounters(task, task.getStatus());
+    updateDedicatedCounters(task, task.getStatus());
   }
 
   @Override

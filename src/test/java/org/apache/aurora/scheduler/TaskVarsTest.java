@@ -53,6 +53,7 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.TaskVars.VETO_GROUPS_TO_COUNTERS;
 import static org.apache.aurora.scheduler.TaskVars.VETO_TYPE_TO_COUNTERS;
+import static org.apache.aurora.scheduler.TaskVars.dedicatedRoleStatName;
 import static org.apache.aurora.scheduler.TaskVars.jobStatName;
 import static org.apache.aurora.scheduler.TaskVars.rackStatName;
 import static org.easymock.EasyMock.expect;
@@ -185,8 +186,11 @@ public class TaskVarsTest extends EasyMockTest {
     expectStatusCountersInitialized();
 
     IScheduledTask taskA = makeTask(JOB_A, INIT);
-    expectGetHostRack("hostA", "rackA").atLeastOnce();
+    expectGetHostAttributes("hostA", "rackA", ImmutableSet.of("role-1/job-1", "role.2/job.2"))
+        .atLeastOnce();
     expectStatExport(rackStatName("rackA"));
+    expectStatExport(dedicatedRoleStatName("role-1/job-1"));
+    expectStatExport(dedicatedRoleStatName("role.2/job.2"));
 
     replayAndBuild();
     schedulerActivated();
@@ -204,6 +208,8 @@ public class TaskVarsTest extends EasyMockTest {
     assertEquals(0, getValue(RUNNING));
     assertEquals(1, getValue(FINISHED));
     assertEquals(0, getValue(rackStatName("rackA")));
+    assertEquals(0, getValue(dedicatedRoleStatName("role-1/job-1")));
+    assertEquals(0, getValue(dedicatedRoleStatName("role.2/job.2")));
     vars.tasksDeleted(new TasksDeleted(ImmutableSet.of(
         IScheduledTask.build(taskA.newBuilder().setStatus(FINISHED)))));
     assertAllZero();
@@ -260,10 +266,12 @@ public class TaskVarsTest extends EasyMockTest {
   @Test
   public void testLoadsFromStorage() {
     expectStatusCountersInitialized();
-    expectGetHostRack("hostA", "rackA").atLeastOnce();
-    expectGetHostRack("hostB", "rackB").atLeastOnce();
+    expectGetHostAttributes("hostA", "rackA", ImmutableSet.of("role-1/job-1")).atLeastOnce();
+    expectGetHostAttributes("hostB", "rackB", ImmutableSet.of("role.2/job.2")).atLeastOnce();
     expectStatExport(rackStatName("rackA"));
     expectStatExport(rackStatName("rackB"));
+    expectStatExport(dedicatedRoleStatName("role-1/job-1"));
+    expectStatExport(dedicatedRoleStatName("role.2/job.2"));
 
     IScheduledTask failedTask = makeTask(JOB_B, FAILED, "hostB");
     expectStatExport(jobStatName(failedTask, FAILED), untrackedProvider);
@@ -282,14 +290,27 @@ public class TaskVarsTest extends EasyMockTest {
     assertEquals(1, getValue(FAILED));
     assertEquals(0, getValue(rackStatName("rackA")));
     assertEquals(0, getValue(rackStatName("rackB")));
+    assertEquals(0, getValue(dedicatedRoleStatName("role-1/job-1")));
+    assertEquals(0, getValue(dedicatedRoleStatName("role.2/job.2")));
     assertEquals(1, getValue(jobStatName(failedTask, FAILED)));
   }
 
-  private IExpectationSetters<?> expectGetHostRack(String host, String rackToReturn) {
+  private IExpectationSetters<?> expectGetHostAttributes(
+      String host,
+      String rackToReturn) {
+    return expectGetHostAttributes(host, rackToReturn, ImmutableSet.of());
+  }
+
+  private IExpectationSetters<?> expectGetHostAttributes(
+      String host,
+      String rackToReturn,
+      ImmutableSet<String> dedicatedAttrs) {
+
     IHostAttributes attributes = IHostAttributes.build(new HostAttributes()
         .setHost(host)
         .setAttributes(ImmutableSet.of(
-            new Attribute().setName("rack").setValues(ImmutableSet.of(rackToReturn)))));
+            new Attribute().setName("rack").setValues(ImmutableSet.of(rackToReturn)),
+            new Attribute().setName("dedicated").setValues(dedicatedAttrs))));
     return expect(storageUtil.attributeStore.getHostAttributes(host))
         .andReturn(Optional.of(attributes));
   }
@@ -297,12 +318,14 @@ public class TaskVarsTest extends EasyMockTest {
   @Test
   public void testLostCounters() {
     expectStatusCountersInitialized();
-    expectGetHostRack("host1", "rackA").atLeastOnce();
-    expectGetHostRack("host2", "rackB").atLeastOnce();
-    expectGetHostRack("host3", "rackB").atLeastOnce();
+    expectGetHostAttributes("host1", "rackA", ImmutableSet.of("role-1/job-1")).atLeastOnce();
+    expectGetHostAttributes("host2", "rackB", ImmutableSet.of("role.2/job.2")).atLeastOnce();
+    expectGetHostAttributes("host3", "rackB").atLeastOnce();
 
     expectStatExport(rackStatName("rackA"));
     expectStatExport(rackStatName("rackB"));
+    expectStatExport(dedicatedRoleStatName("role-1/job-1"));
+    expectStatExport(dedicatedRoleStatName("role.2/job.2"));
 
     IScheduledTask a = makeTask(JOB_A, RUNNING, "host1");
     IScheduledTask b = makeTask(JOB_B, RUNNING, "host2");
@@ -325,6 +348,9 @@ public class TaskVarsTest extends EasyMockTest {
     assertEquals(2, getValue(rackStatName("rackA")));
     assertEquals(2, getValue(rackStatName("rackB")));
 
+    assertEquals(2, getValue(dedicatedRoleStatName("role-1/job-1")));
+    assertEquals(1, getValue(dedicatedRoleStatName("role.2/job.2")));
+
     assertEquals(1, getValue(jobStatName(a, LOST)));
     assertEquals(1, getValue(jobStatName(b, LOST)));
     assertEquals(2, getValue(jobStatName(c, LOST)));
@@ -333,6 +359,8 @@ public class TaskVarsTest extends EasyMockTest {
   @Test
   public void testRackMissing() {
     expectStatusCountersInitialized();
+    expect(storageUtil.attributeStore.getHostAttributes("a"))
+        .andReturn(Optional.empty());
     expect(storageUtil.attributeStore.getHostAttributes("a"))
         .andReturn(Optional.empty());
 
