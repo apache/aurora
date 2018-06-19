@@ -51,4 +51,15 @@ public final class InstanceKeys {
   public static String toString(IInstanceKey instance) {
     return JobKeys.canonicalString(instance.getJobKey()) + "/" + instance.getInstanceId();
   }
+
+  /**
+   * Creates a human-friendly string for an instance key.
+   *
+   * @param job Job key.
+   * @param instanceId Instance id.
+   * @return String representation of the instance key.
+   */
+  public static String toString(IJobKey job, int instanceId) {
+    return toString(from(job, instanceId));
+  }
 }

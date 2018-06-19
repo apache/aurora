@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -27,7 +28,11 @@ import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Predicates;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -46,6 +51,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.scheduler.BatchWorker;
 import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
+import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
@@ -171,6 +177,7 @@ public interface MaintenanceController {
     @VisibleForTesting
     static final String DRAINING_MESSAGE = "Draining machine for maintenance.";
 
+    private static final String MAINTENANCE_COUNTDOWN_STAT_NAME = "maintenance_countdown_ms";
     private static final String MISSING_MAINTENANCE_REQUEST = "missing_maintenance_request";
     private static final SlaPolicy ZERO_PERCENT_SLA = SlaPolicy.percentageSlaPolicy(
         new PercentageSlaPolicy()
@@ -184,6 +191,7 @@ public interface MaintenanceController {
     private final StateManager stateManager;
 
     private final AtomicLong missingMaintenanceCounter;
+    private final LoadingCache<String, AtomicLong> maintenanceCountDownByTask;
 
     @Inject
     public MaintenanceControllerImpl(
@@ -200,6 +208,14 @@ public interface MaintenanceController {
       this.slaManager = requireNonNull(slaManager);
       this.stateManager = requireNonNull(stateManager);
       this.missingMaintenanceCounter = statsProvider.makeCounter(MISSING_MAINTENANCE_REQUEST);
+      this.maintenanceCountDownByTask = CacheBuilder.newBuilder().build(
+          new CacheLoader<String, AtomicLong>() {
+            @Override
+            public AtomicLong load(String key) {
+              return statsProvider.makeCounter(key);
+            }
+          }
+      );
     }
 
     private Set<String> drainTasksOnHost(String host, StoreProvider store) {
@@ -214,7 +230,13 @@ public interface MaintenanceController {
 
       // shuffle the candidates to avoid head-of-line blocking
       Collections.shuffle(candidates);
-      candidates.forEach(task -> drainTask(task, store));
+      candidates.forEach(task -> {
+        try {
+          drainTask(task, store);
+        } catch (ExecutionException e) {
+          LOG.error("Exception when trying to drain task: {}", Tasks.id(task), e);
+        }
+      });
 
       return candidates.stream().map(Tasks::id).collect(Collectors.toSet());
     }
@@ -432,7 +454,7 @@ public interface MaintenanceController {
           pollingInterval.getUnit().getTimeUnit());
     }
 
-    private void drainTask(IScheduledTask task, StoreProvider store) {
+    private void drainTask(IScheduledTask task, StoreProvider store) throws ExecutionException {
       String host = task.getAssignedTask().getSlaveHost();
       Optional<IHostMaintenanceRequest> hostMaintenanceRequest =
           store.getHostMaintenanceStore().getHostMaintenanceRequest(host);
@@ -445,6 +467,15 @@ public interface MaintenanceController {
       boolean force = false;
       long expireMs =
           System.currentTimeMillis() - hostMaintenanceRequest.get().getCreatedTimestampMs();
+      long maintenanceCountDownMs =
+          TimeAmount.of(hostMaintenanceRequest.get().getTimeoutSecs(), Time.SECONDS)
+              .as(Time.MILLISECONDS) - expireMs;
+      maintenanceCountDownByTask.get(
+          Joiner.on("_")
+              .join(MAINTENANCE_COUNTDOWN_STAT_NAME,
+                  InstanceKeys.toString(Tasks.getJob(task), Tasks.getInstanceId(task))))
+          .getAndSet(maintenanceCountDownMs);
+
       if (hostMaintenanceRequest.get().getTimeoutSecs()
             < TimeAmount.of(expireMs, Time.MILLISECONDS).as(Time.SECONDS)) {
         LOG.warn("Maintenance request timed out for host: {} after {} secs. Forcing drain of {}.",
