@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
@@ -174,6 +175,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         IHostMaintenanceRequest.build(new HostMaintenanceRequest()
             .setHost(HOST_A)
             .setCreatedTimestampMs(System.currentTimeMillis())
+            .setTimeoutSecs(7200)
             .setDefaultSlaPolicy(SLA_POLICY));
 
     storageUtil.hostMaintenanceStore.saveHostMaintenanceRequest(
@@ -294,6 +296,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         IHostMaintenanceRequest.build(new HostMaintenanceRequest()
             .setHost(HOST_A)
             .setCreatedTimestampMs(System.currentTimeMillis())
+            .setTimeoutSecs(7200)
             .setDefaultSlaPolicy(SLA_POLICY));
     expect(storageUtil.hostMaintenanceStore.getHostMaintenanceRequest(HOST_A))
         .andReturn(Optional.of(maintenanceRequest)).times(2);
@@ -385,6 +388,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         IHostMaintenanceRequest.build(new HostMaintenanceRequest()
             .setHost(HOST_A)
             .setCreatedTimestampMs(System.currentTimeMillis())
+            .setTimeoutSecs(7200)
             .setDefaultSlaPolicy(SLA_POLICY));
     expect(storageUtil.hostMaintenanceStore.getHostMaintenanceRequest(HOST_A))
         .andReturn(Optional.of(maintenanceRequest)).times(1);
@@ -402,6 +406,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         eq(task),
         eq(ISlaPolicy.build(SLA_POLICY)),
         anyObject(Storage.MutateWork.class),
+        anyObject(ImmutableMap.class),
         eq(force));
   }
 

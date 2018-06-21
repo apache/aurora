@@ -123,8 +123,8 @@ specified for a job, any action that requires removing a task
 (such as drains) will be required to get approval from the `Coordinator` before proceeding. The
 coordinator service needs to expose a HTTP endpoint, that can take a `task-key` param
 (`<cluster>/<role>/<env>/<name>/<instance>`) and a json body describing the task
-details and return a response json that will contain the boolean status for allowing or disallowing
-the task's removal.
+details, force maintenance countdown (ms) and other params and return a response json that will
+contain the boolean status for allowing or disallowing the task's removal.
 
 ##### Request:
 ```javascript
@@ -132,24 +132,28 @@ POST /
   ?task=<cluster>/<role>/<env>/<name>/<instance>
 
 {
-  "assignedTask": {
-    "taskId": "taskA",
-    "slaveHost": "a",
-    "task": {
-      "job": {
-        "role": "role",
-        "environment": "devel",
-        "name": "job"
+  "forceMaintenanceCountdownMs": "604755646",
+  "task": "cluster/role/devel/job/1",
+  "taskConfig": {
+    "assignedTask": {
+      "taskId": "taskA",
+      "slaveHost": "a",
+      "task": {
+        "job": {
+          "role": "role",
+          "environment": "devel",
+          "name": "job"
+        },
+        ...
       },
+      "assignedPorts": {
+        "http": 1000
+      },
+      "instanceId": 1
       ...
     },
-    "assignedPorts": {
-      "http": 1000
-    },
-    "instanceId": 1
     ...
-  },
-  ...
+  }
 }
 ```
 

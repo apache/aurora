@@ -33,6 +33,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Striped;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
@@ -266,13 +268,15 @@ public class SlaManager extends AbstractIdleService {
    * @param task Task whose SLA is to checked.
    * @param slaPolicy {@link ICoordinatorSlaPolicy} to use for checking SLA.
    * @param work {@link Storage.MutateWork} to perform, if SLA is satisfied.
+   * @param params dictionary of key-value pairs to send in json body to Coordinator
    * @param <T> The type of result the {@link Storage.MutateWork} produces.
    * @param <E> The type of exception the {@link Storage.MutateWork} throw.
    */
   private <T, E extends Exception> void askCoordinatorThenAct(
       IScheduledTask task,
       ICoordinatorSlaPolicy slaPolicy,
-      Storage.MutateWork<T, E> work) {
+      Storage.MutateWork<T, E> work,
+      Map<String, String> params) {
 
     String taskKey = getTaskKey(task);
 
@@ -287,7 +291,7 @@ public class SlaManager extends AbstractIdleService {
             taskKey);
         attemptsCounter.incrementAndGet();
 
-        if (coordinatorAllows(task, taskKey, slaPolicy)) {
+        if (coordinatorAllows(task, taskKey, slaPolicy, params)) {
           LOG.info("Performing work after coordinator: {} approval for task: {}",
               slaPolicy.getCoordinatorUrl(),
               taskKey);
@@ -322,14 +326,22 @@ public class SlaManager extends AbstractIdleService {
   private boolean coordinatorAllows(
       IScheduledTask task,
       String taskKey,
-      ICoordinatorSlaPolicy slaPolicy)
+      ICoordinatorSlaPolicy slaPolicy,
+      Map<String, String> params)
       throws InterruptedException, ExecutionException, TException {
 
     LOG.info("Checking coordinator: {} for task: {}", slaPolicy.getCoordinatorUrl(), taskKey);
 
+    String taskConfig = new TSerializer(new TSimpleJSONProtocol.Factory())
+        .toString(task.newBuilder());
+    JsonObject jsonBody = new JsonObject();
+    jsonBody.add("taskConfig", new JsonParser().parse(taskConfig));
+    jsonBody.addProperty(TASK_PARAM, taskKey);
+    params.forEach(jsonBody::addProperty);
+
     Response response = httpClient.preparePost(slaPolicy.getCoordinatorUrl())
         .setQueryParams(ImmutableList.of(new Param(TASK_PARAM, taskKey)))
-        .setBody(new TSerializer(new TSimpleJSONProtocol.Factory()).toString(task.newBuilder()))
+        .setBody(new Gson().toJson(jsonBody))
         .execute()
         .get();
 
@@ -391,6 +403,7 @@ public class SlaManager extends AbstractIdleService {
    * @param task Task whose SLA is to be checked.
    * @param slaPolicy {@link ISlaPolicy} to use.
    * @param work {@link Storage.MutateWork} to perform, if SLA is satisfied.
+   * @param params dictionary of key-value pairs to send in json body to Coordinator
    * @param force boolean to indicate if work should be performed without checking SLA.
    * @param <T> The type of result the {@link Storage.MutateWork} produces.
    * @param <E> The type of exception the {@link Storage.MutateWork} throw.
@@ -401,6 +414,7 @@ public class SlaManager extends AbstractIdleService {
       IScheduledTask task,
       ISlaPolicy slaPolicy,
       Storage.MutateWork<T, E> work,
+      Map<String, String> params,
       boolean force) throws E {
 
     if (force) {
@@ -417,7 +431,8 @@ public class SlaManager extends AbstractIdleService {
       executor.execute(() -> askCoordinatorThenAct(
           task,
           slaPolicy.getCoordinatorSlaPolicy(),
-          work));
+          work,
+          params));
     } else {
       // verify sla and perform work if satisfied
       storage.write(store -> {

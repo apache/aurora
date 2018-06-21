@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.sla;
 
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,7 +26,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -207,6 +212,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -245,6 +251,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -279,6 +286,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -310,6 +318,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -341,6 +350,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -372,6 +382,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -403,6 +414,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -427,6 +439,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         true);
   }
 
@@ -462,6 +475,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -503,6 +517,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -540,6 +555,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -571,6 +587,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -602,6 +619,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -633,6 +651,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -665,6 +684,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         false);
   }
 
@@ -690,6 +710,7 @@ public class SlaManagerTest extends EasyMockTest {
         storeProvider -> storeProvider
             .getUnsafeTaskStore()
             .fetchTask(task1.getAssignedTask().getTaskId()),
+        ImmutableMap.of(),
         true);
   }
 
@@ -724,6 +745,52 @@ public class SlaManagerTest extends EasyMockTest {
                 .fetchTask(task1.getAssignedTask().getTaskId());
             return null;
           },
+          ImmutableMap.of(),
+          false);
+    }
+
+    // wait until we are sure that the server has responded
+    coordinatorResponded.await();
+    workCalled.await();
+
+    assertEquals(0, coordinatorResponded.getCount());
+    // check the work was called
+    assertEquals(0, workCalled.getCount());
+  }
+
+  /**
+   * Verifies that SLA check passes and the supplied {@link Storage.MutateWork} gets executed
+   * for a job when {@link CoordinatorSlaPolicy#coordinatorUrl} responds
+   * with {@code {"drain": true}} when supplied with extra params.
+   */
+  @Test
+  public void testCheckCoordinatorWithExtraParamsSlaPassesThenActs() throws Exception {
+    IScheduledTask task1 = makeTask("taskA", 1, RUNNING);
+    CountDownLatch workCalled = new CountDownLatch(1);
+
+    Map<String, String> extraParams = ImmutableMap.of("someKey", "someValue");
+    jettyServer.setHandler(mockCoordinatorResponse(task1, "{\"drain\": true}", extraParams));
+    jettyServer.start();
+
+    // expect that the fetchTask in the work is called, after sla check passes
+    expect(storageUtil.taskStore.fetchTask(task1.getAssignedTask().getTaskId()))
+        .andReturn(Optional.of(task1));
+
+    control.replay();
+
+    while (!coordinatorResponded.await(100, TimeUnit.MILLISECONDS)) {
+      slaManager.checkSlaThenAct(
+          task1,
+          createCoordinatorSlaPolicy(),
+          storeProvider -> {
+            // set the marker to indicate that we performed the work
+            workCalled.countDown();
+            storeProvider
+                .getUnsafeTaskStore()
+                .fetchTask(task1.getAssignedTask().getTaskId());
+            return null;
+          },
+          extraParams,
           false);
     }
 
@@ -767,6 +834,7 @@ public class SlaManagerTest extends EasyMockTest {
                 .fetchTask(task1.getAssignedTask().getTaskId());
             return null;
           },
+          ImmutableMap.of(),
           false);
     }
 
@@ -804,6 +872,7 @@ public class SlaManagerTest extends EasyMockTest {
                 .fetchTask(task1.getAssignedTask().getTaskId());
             return null;
           },
+          ImmutableMap.of(),
           false);
     }
 
@@ -847,6 +916,7 @@ public class SlaManagerTest extends EasyMockTest {
               .fetchTask(task1.getAssignedTask().getTaskId());
           return null;
         },
+        ImmutableMap.of(),
         true);
 
     workCalled.await();
@@ -884,6 +954,7 @@ public class SlaManagerTest extends EasyMockTest {
                 .fetchTask(task1.getAssignedTask().getTaskId());
             return null;
           },
+          ImmutableMap.of(),
           false);
     }
 
@@ -925,6 +996,7 @@ public class SlaManagerTest extends EasyMockTest {
               .fetchTask(task1.getAssignedTask().getTaskId());
           return null;
         },
+        ImmutableMap.of(),
         false);
 
     try {
@@ -987,6 +1059,7 @@ public class SlaManagerTest extends EasyMockTest {
                 LOG.info("Finished action1 for task:{}", slaManager.getTaskKey(task1));
                 return null;
               },
+              ImmutableMap.of(),
               false);
         }
       } catch (InterruptedException e) {
@@ -1019,6 +1092,7 @@ public class SlaManagerTest extends EasyMockTest {
                 LOG.info("Finished action2 for task:{}", slaManager.getTaskKey(task2));
                 return null;
               },
+              ImmutableMap.of(),
               false);
         }
       } catch (InterruptedException e) {
@@ -1104,6 +1178,7 @@ public class SlaManagerTest extends EasyMockTest {
                 LOG.info("Finished action for task:{}", slaManager.getTaskKey(task1));
                 return null;
               },
+              ImmutableMap.of(),
               false);
         }
       } catch (InterruptedException e) {
@@ -1137,6 +1212,7 @@ public class SlaManagerTest extends EasyMockTest {
                 LOG.info("Finished action for task:{}", slaManager.getTaskKey(task2));
                 return null;
               },
+              ImmutableMap.of(),
               false);
         }
       } catch (InterruptedException e) {
@@ -1178,6 +1254,13 @@ public class SlaManagerTest extends EasyMockTest {
   private AbstractHandler mockCoordinatorResponse(
       IScheduledTask task,
       String pollResponse) {
+    return mockCoordinatorResponse(task, pollResponse, ImmutableMap.of());
+  }
+
+  private AbstractHandler mockCoordinatorResponse(
+      IScheduledTask task,
+      String pollResponse,
+      Map<String, String> params) {
 
     return new AbstractHandler() {
       @Override
@@ -1191,8 +1274,15 @@ public class SlaManagerTest extends EasyMockTest {
           String query = Joiner
               .on("=")
               .join(SlaManager.TASK_PARAM, URLEncoder.encode(taskKey, "UTF-8"));
-          String body = new TSerializer(new TSimpleJSONProtocol.Factory())
+
+          String taskConfig = new TSerializer(new TSimpleJSONProtocol.Factory())
               .toString(task.newBuilder());
+          JsonObject jsonBody = new JsonObject();
+          jsonBody.add("taskConfig", new JsonParser().parse(taskConfig));
+          jsonBody.addProperty(SlaManager.TASK_PARAM, taskKey);
+          params.forEach(jsonBody::addProperty);
+          String body = new Gson().toJson(jsonBody);
+
           if (request.getQueryString().equals(query)
               && request.getReader().lines().collect(Collectors.joining()).equals(body)) {
             createResponse(baseRequest, response, pollResponse);

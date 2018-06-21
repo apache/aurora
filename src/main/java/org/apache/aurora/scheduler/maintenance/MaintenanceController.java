@@ -33,6 +33,7 @@ import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -176,6 +177,8 @@ public interface MaintenanceController {
 
     @VisibleForTesting
     static final String DRAINING_MESSAGE = "Draining machine for maintenance.";
+
+    private static final String COUNTDOWN_MS_PARAM = "forceMaintenanceCountdownMs";
 
     private static final String MAINTENANCE_COUNTDOWN_STAT_NAME = "maintenance_countdown_ms";
     private static final String MISSING_MAINTENANCE_REQUEST = "missing_maintenance_request";
@@ -465,19 +468,23 @@ public interface MaintenanceController {
       }
 
       boolean force = false;
-      long expireMs =
-          System.currentTimeMillis() - hostMaintenanceRequest.get().getCreatedTimestampMs();
-      long maintenanceCountDownMs =
-          TimeAmount.of(hostMaintenanceRequest.get().getTimeoutSecs(), Time.SECONDS)
-              .as(Time.MILLISECONDS) - expireMs;
+      long startMs = hostMaintenanceRequest.get().getCreatedTimestampMs();
+      long timeoutMs = TimeAmount.of(
+            hostMaintenanceRequest.get().getTimeoutSecs(),
+            Time.SECONDS)
+          .as(Time.MILLISECONDS);
+      long endMs = startMs + timeoutMs;
+      long remainingMs = endMs - System.currentTimeMillis();
       maintenanceCountDownByTask.get(
           Joiner.on("_")
-              .join(MAINTENANCE_COUNTDOWN_STAT_NAME,
-                  InstanceKeys.toString(Tasks.getJob(task), Tasks.getInstanceId(task))))
-          .getAndSet(maintenanceCountDownMs);
+              .join(
+                  MAINTENANCE_COUNTDOWN_STAT_NAME,
+                  InstanceKeys.toString(Tasks.getJob(task), Tasks.getInstanceId(task))
+              )
+            )
+          .getAndSet(remainingMs);
 
-      if (hostMaintenanceRequest.get().getTimeoutSecs()
-            < TimeAmount.of(expireMs, Time.MILLISECONDS).as(Time.SECONDS)) {
+      if (remainingMs < 0) {
         LOG.warn("Maintenance request timed out for host: {} after {} secs. Forcing drain of {}.",
             host, hostMaintenanceRequest.get().getTimeoutSecs(), Tasks.id(task));
         force = true;
@@ -496,6 +503,7 @@ public interface MaintenanceController {
               Optional.empty(),
               ScheduleStatus.DRAINING,
               Optional.of(DRAINING_MESSAGE)),
+          ImmutableMap.of(COUNTDOWN_MS_PARAM, Long.toString(remainingMs)),
           force);
     }
   }
