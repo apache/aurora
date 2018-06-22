@@ -98,7 +98,7 @@ function SlaPolicy({ config }) {
       </tr>];
   } else if (!isNully(config.slaPolicy.coordinatorSlaPolicy)) {
     return [<tr>
-        <th rowSpan='4'>Coordinator SLA Policy</th>
+        <th rowSpan='2'>Coordinator SLA Policy</th>
         <td>coordinator url</td>
         <td>{config.slaPolicy.coordinatorSlaPolicy.coordinatorUrl}</td>
       </tr>,
