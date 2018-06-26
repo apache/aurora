@@ -52,9 +52,10 @@ export function getActiveResource(resource) {
 }
 
 export function constraintToString(constraint) {
+  console.log(constraint);
   return isNully(constraint.value)
     ? `limit=${constraint.limit.limit}`
-    : constraint.value.values.join(',');
+    : (constraint.value.negated ? '!' : '=') + constraint.value.values.join(',');
 }
 
 export function getResource(resources, key) {
