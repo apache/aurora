@@ -577,16 +577,16 @@ struct GetJobsResult {
  * (terms are AND'ed together).
  */
 struct TaskQuery {
-  14: string role
-  9: string environment
-  2: string jobName
-  4: set<string> taskIds
-  5: set<ScheduleStatus> statuses
-  7: set<i32> instanceIds
-  10: set<string> slaveHosts
-  11: set<JobKey> jobKeys
-  12: i32 offset
-  13: i32 limit
+  14: optional string role
+  9: optional string environment
+  2: optional string jobName
+  4: optional set<string> taskIds
+  5: optional set<ScheduleStatus> statuses
+  7: optional set<i32> instanceIds
+  10: optional set<string> slaveHosts
+  11: optional set<JobKey> jobKeys
+  12: optional i32 offset
+  13: optional i32 limit
 }
 
 struct HostStatus {
