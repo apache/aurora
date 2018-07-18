@@ -83,6 +83,11 @@ class FailingStartingTaskRunner(ThermosTaskRunner):
     raise TaskError('I am an idiot!')
 
 
+class ErroringStartingTaskRunner(ThermosTaskRunner):
+  def start(self):
+    raise Exception('I am an idiot!')
+
+
 class FailingSandbox(DirectorySandbox):
   def __init__(self, root, exception_type, **kwargs):
     self._exception_type = exception_type
@@ -507,6 +512,20 @@ class TestThermosExecutor(object):
       te = FastThermosExecutor(
           runner_provider=runner_provider,
           sandbox_provider=DefaultTestSandboxProvider())
+      te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
+      proxy_driver.wait_stopped()
+
+      updates = proxy_driver.method_calls['sendStatusUpdate']
+      assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
+
+  def test_unknown_exception_runner_start(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as td:
+      runner_provider = make_provider(td, ErroringStartingTaskRunner)
+      te = FastThermosExecutor(
+        runner_provider=runner_provider,
+        sandbox_provider=DefaultTestSandboxProvider())
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       proxy_driver.wait_stopped()
 

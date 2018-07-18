@@ -155,6 +155,9 @@ class AuroraExecutor(ExecutorBase, Observable):
     except Timeout:
       self._die(driver, mesos_pb2.TASK_LOST, 'Timed out waiting for task to start!')
       return False
+    except Exception as e:
+      self._die(driver, mesos_pb2.TASK_FAILED, 'Unknown exception starting runner: %s' % e)
+      return False
 
     self.runner_started.set()
     log.debug('Task started.')
