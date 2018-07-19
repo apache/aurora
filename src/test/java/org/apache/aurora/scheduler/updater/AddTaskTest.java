@@ -55,6 +55,7 @@ public class AddTaskTest extends EasyMockTest {
   private StateManager stateManager;
   private InstanceActionHandler handler;
   private UpdateAgentReserver updateAgentReserver;
+  private SlaKillController slaKillController;
 
   @Before
   public void setUp() {
@@ -63,6 +64,7 @@ public class AddTaskTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     updateAgentReserver = createMock(UpdateAgentReserver.class);
     handler = new InstanceActionHandler.AddTask();
+    slaKillController = createMock(SlaKillController.class);
   }
 
   @Test
@@ -83,7 +85,8 @@ public class AddTaskTest extends EasyMockTest {
         stateManager,
         updateAgentReserver,
         JobUpdateStatus.ROLLING_FORWARD,
-        UPDATE_ID);
+        UPDATE_ID,
+        slaKillController);
   }
 
   @Test
@@ -101,7 +104,8 @@ public class AddTaskTest extends EasyMockTest {
         stateManager,
         updateAgentReserver,
         JobUpdateStatus.ROLLING_FORWARD,
-        UPDATE_ID);
+        UPDATE_ID,
+        slaKillController);
   }
 
   @Test(expected = IllegalStateException.class)
@@ -117,6 +121,7 @@ public class AddTaskTest extends EasyMockTest {
         stateManager,
         updateAgentReserver,
         JobUpdateStatus.ROLLING_BACK,
-        UPDATE_ID);
+        UPDATE_ID,
+        slaKillController);
   }
 }

@@ -84,6 +84,19 @@ progress until the first pulse arrives. However, a paused update (`ROLL_FORWARD_
 provided the pulse interval has not expired.
 
 
+SLA-Aware Updates
+-----------------
+
+Updates can take advantage of [Custom SLA Requirements](../features/sla-requirements.md) and
+specify the `sla_aware=True` option within
+[UpdateConfig](../reference/configuration.md#updateconfig-objects) to only update instances if
+the action will maintain the task's SLA requirements. This feature allows updates to avoid killing
+too many instances in the face of unexpected failures outside of the update range.
+
+See the [Using the `sla_aware` option](../reference/configuration.md#using-the-sla-aware-option)
+for more information on how to use this feature.
+
+
 Canary Deployments
 ------------------
 

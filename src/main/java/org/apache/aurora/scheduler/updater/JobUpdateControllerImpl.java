@@ -124,8 +124,9 @@ class JobUpdateControllerImpl implements JobUpdateController {
   private final Clock clock;
   private final PulseHandler pulseHandler;
   private final Lifecycle lifecycle;
-  private final TaskEventBatchWorker batchWorker;
+  private final TaskEventBatchWorker taskEventBatchWorker;
   private final UpdateAgentReserver updateAgentReserver;
+  private final SlaKillController slaKillController;
 
   // Currently-active updaters. An active updater is one that is rolling forward or back. Paused
   // and completed updates are represented only in storage, not here.
@@ -144,8 +145,9 @@ class JobUpdateControllerImpl implements JobUpdateController {
       UpdateAgentReserver updateAgentReserver,
       Clock clock,
       Lifecycle lifecycle,
-      TaskEventBatchWorker batchWorker,
-      StatsProvider statsProvider) {
+      TaskEventBatchWorker taskEventBatchWorker,
+      StatsProvider statsProvider,
+      SlaKillController slaKillController) {
 
     this.updateFactory = requireNonNull(updateFactory);
     this.storage = requireNonNull(storage);
@@ -153,9 +155,10 @@ class JobUpdateControllerImpl implements JobUpdateController {
     this.stateManager = requireNonNull(stateManager);
     this.clock = requireNonNull(clock);
     this.lifecycle = requireNonNull(lifecycle);
-    this.batchWorker = requireNonNull(batchWorker);
+    this.taskEventBatchWorker = requireNonNull(taskEventBatchWorker);
     this.pulseHandler = new PulseHandler(clock);
     this.updateAgentReserver = requireNonNull(updateAgentReserver);
+    this.slaKillController = requireNonNull(slaKillController);
 
     this.jobUpdateEventStats = CacheBuilder.newBuilder()
         .build(new CacheLoader<JobUpdateStatus, AtomicLong>() {
@@ -265,9 +268,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       }
 
       IJobUpdate update = details.get().getUpdate();
-      IJobUpdateKey key1 = update.getSummary().getKey();
       Function<JobUpdateStatus, JobUpdateStatus> stateChange =
-          isCoordinatedAndPulseExpired(key1, update.getInstructions())
+          isCoordinatedAndPulseExpired(key, update.getInstructions())
               ? GET_BLOCKED_RESUME_STATE
               : GET_ACTIVE_RESUME_STATE;
 
@@ -403,20 +405,28 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private void instanceChanged(final IInstanceKey instance, final Optional<IScheduledTask> state) {
-    batchWorker.execute(storeProvider -> {
+    taskEventBatchWorker.execute(storeProvider -> {
       IJobKey job = instance.getJobKey();
       UpdateFactory.Update update = updates.get(job);
       if (update != null) {
         if (update.getUpdater().containsInstance(instance.getInstanceId())) {
-          LOG.info("Forwarding task change for " + InstanceKeys.toString(instance));
-          try {
-            evaluateUpdater(
-                storeProvider,
-                update,
-                getOnlyMatch(storeProvider.getJobUpdateStore(), queryActiveByJob(job)),
-                ImmutableMap.of(instance.getInstanceId(), state));
-          } catch (UpdateStateException e) {
-            throw new RuntimeException(e);
+          // We check to see if the state change is specified, and if it is, ensure that the new
+          // state matches the current state. We do this because events are processed asynchronously
+          // and it is possible for an old event trigger an action that should not be triggered
+          // for the actual updated state.
+          if (!state.isPresent() || isLatestState(storeProvider, state.get())) {
+            LOG.info("Forwarding task change for " + InstanceKeys.toString(instance));
+            try {
+              evaluateUpdater(
+                  storeProvider,
+                  update,
+                  getOnlyMatch(storeProvider.getJobUpdateStore(), queryActiveByJob(job)),
+                  ImmutableMap.of(instance.getInstanceId(), state));
+            } catch (UpdateStateException e) {
+              throw new RuntimeException(e);
+            }
+          } else {
+            LOG.info("Ignoring out of date task change for " + instance);
           }
         } else {
           LOG.info("Instance " + instance + " is not part of active update for "
@@ -425,6 +435,20 @@ class JobUpdateControllerImpl implements JobUpdateController {
       }
       return BatchWorker.NO_RESULT;
     });
+  }
+
+  /**
+   * Check to see that a given {@link IScheduledTask} still exists in storage and has the same
+   * status.
+   */
+  private boolean isLatestState(MutableStoreProvider storeProvider, IScheduledTask reportedState) {
+    Optional<IScheduledTask> currentState = storeProvider
+        .getTaskStore()
+        .fetchTask(reportedState.getAssignedTask().getTaskId());
+
+    return currentState
+        .map(iScheduledTask -> iScheduledTask.getStatus() == reportedState.getStatus())
+        .orElse(false);
   }
 
   private IJobUpdateSummary getOnlyMatch(JobUpdateStore store, IJobUpdateQuery query) {
@@ -690,7 +714,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
                 stateManager,
                 updateAgentReserver,
                 updaterStatus,
-                key);
+                key,
+                slaKillController);
             if (reevaluateDelay.isPresent()) {
               executor.schedule(
                   getDeferredEvaluator(instance, key),

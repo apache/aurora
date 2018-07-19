@@ -37,6 +37,7 @@ class UpdateConfig(Struct):
   rollback_on_failure         = Default(Boolean, True)
   wait_for_batch_completion   = Default(Boolean, False)
   pulse_interval_secs         = Integer
+  sla_aware                   = Default(Boolean, False)
 
 
 class HttpHealthChecker(Struct):

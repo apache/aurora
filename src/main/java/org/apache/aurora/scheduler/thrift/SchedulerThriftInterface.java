@@ -818,6 +818,10 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       return invalidRequest(INVALID_PULSE_TIMEOUT);
     }
 
+    if (settings.isSlaAware() && !mutableRequest.getTaskConfig().isSetSlaPolicy()) {
+      return invalidRequest(INVALID_SLA_AWARE_UPDATE);
+    }
+
     IJobUpdateRequest request;
     try {
       request = IJobUpdateRequest.build(
@@ -1071,4 +1075,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   @VisibleForTesting
   static final String INVALID_INSTANCE_COUNT = "Instance count must be positive.";
+
+  @VisibleForTesting
+  static final String INVALID_SLA_AWARE_UPDATE = "slaAware is true, but no task slaPolicy is "
+      + "specified.";
 }

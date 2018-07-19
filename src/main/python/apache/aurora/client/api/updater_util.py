@@ -31,7 +31,8 @@ class UpdaterConfig(object):
                max_total_failures,
                rollback_on_failure=True,
                wait_for_batch_completion=False,
-               pulse_interval_secs=None):
+               pulse_interval_secs=None,
+               sla_aware=None):
 
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
@@ -48,6 +49,7 @@ class UpdaterConfig(object):
     self.rollback_on_failure = rollback_on_failure
     self.wait_for_batch_completion = wait_for_batch_completion
     self.pulse_interval_secs = pulse_interval_secs
+    self.sla_aware = sla_aware
 
   @classmethod
   def instances_to_ranges(cls, instances):
@@ -86,7 +88,9 @@ class UpdaterConfig(object):
         rollbackOnFailure=self.rollback_on_failure,
         waitForBatchCompletion=self.wait_for_batch_completion,
         updateOnlyTheseInstances=self.instances_to_ranges(instances) if instances else None,
-        blockIfNoPulsesAfterMs=self.pulse_interval_secs * 1000 if self.pulse_interval_secs else None
+        blockIfNoPulsesAfterMs=(self.pulse_interval_secs * 1000 if self.pulse_interval_secs
+            else None),
+        slaAware=self.sla_aware
     )
 
   def __eq__(self, other):

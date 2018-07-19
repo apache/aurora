@@ -35,6 +35,8 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
+import static org.apache.aurora.gen.ScheduleStatus.KILLING;
+
 /**
  * Utility class providing convenience functions relating to tasks.
  */
@@ -100,6 +102,10 @@ public final class Tasks {
 
   public static boolean isActive(ScheduleStatus status) {
     return ACTIVE_STATES.contains(status);
+  }
+
+  public static boolean isKillable(ScheduleStatus status) {
+    return Tasks.isActive(status) && status != KILLING;
   }
 
   public static boolean isTerminated(ScheduleStatus status) {

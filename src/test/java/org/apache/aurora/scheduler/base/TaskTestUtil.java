@@ -121,6 +121,11 @@ public final class TaskTestUtil {
   }
 
   public static ITaskConfig makeConfig(IJobKey job, boolean prod) {
+    return makeConfig(job, prod, Optional.of(SlaPolicy.percentageSlaPolicy(
+        new PercentageSlaPolicy().setPercentage(95.0).setDurationSecs(1800))));
+  }
+
+  public static ITaskConfig makeConfig(IJobKey job, boolean prod, Optional<SlaPolicy> slaPolicy) {
     return ITaskConfig.build(new TaskConfig()
         .setJob(job.newBuilder())
         .setOwner(new Identity().setUser(job.getRole() + "-user"))
@@ -130,8 +135,7 @@ public final class TaskTestUtil {
         .setProduction(prod)
         .setTier(prod ? PROD_TIER_NAME : DEV_TIER_NAME)
         .setPartitionPolicy(new PartitionPolicy().setDelaySecs(5).setReschedule(true))
-        .setSlaPolicy(SlaPolicy.percentageSlaPolicy(
-            new PercentageSlaPolicy().setPercentage(95.0).setDurationSecs(1800)))
+        .setSlaPolicy(slaPolicy.orElse(null))
         .setConstraints(ImmutableSet.of(
             new Constraint(
                 "valueConstraint",

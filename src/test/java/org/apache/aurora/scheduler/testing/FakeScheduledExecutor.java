@@ -188,6 +188,10 @@ public final class FakeScheduledExecutor extends FakeClock {
     }
   }
 
+  public int countDeferredWork() {
+    return deferredWork.size();
+  }
+
   public void assertEmpty() {
     assertEquals(ImmutableList.<Pair<Long, Runnable>>of(), deferredWork);
   }

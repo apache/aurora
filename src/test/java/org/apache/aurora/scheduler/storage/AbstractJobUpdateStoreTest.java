@@ -105,7 +105,8 @@ public abstract class AbstractJobUpdateStoreTest {
         .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent()
             .setTimestampMs(2)
             .setInstanceId(1)
-            .setAction(INSTANCE_UPDATING)));
+            .setAction(INSTANCE_UPDATING)
+            .setMessage("message2")));
     JobUpdateInstructions instructions = builder.getUpdate().getInstructions();
     Stream.of(
         instructions.getInitialState().stream()
@@ -630,6 +631,7 @@ public abstract class AbstractJobUpdateStoreTest {
             .setMaxFailedInstances(1)
             .setMinWaitInInstanceRunningMs(200)
             .setRollbackOnFailure(true)
+            .setSlaAware(true)
             .setWaitForBatchCompletion(true)
             .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 0), new Range(3, 5)))));
   }

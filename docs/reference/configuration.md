@@ -376,6 +376,35 @@ Parameters for controlling the rate and policy of rolling updates.
 | ```rollback_on_failure```    | boolean  | When False, prevents auto rollback of a failed update (Default: True)
 | ```wait_for_batch_completion```| boolean | When True, all threads from a given batch will be blocked from picking up new instances until the entire batch is updated. This essentially simulates the legacy sequential updater algorithm. (Default: False)
 | ```pulse_interval_secs```    | Integer  |  Indicates a [coordinated update](../features/job-updates.md#coordinated-job-updates). If no pulses are received within the provided interval the update will be blocked. Beta-updater only. Will fail on submission when used with client updater. (Default: None)
+| ```sla_aware```              | boolean  | When True, updates will only update an instance if it does not break the task's specified [SLA Requirements](../features/sla-requirements.md). (Default: None)
+
+#### Using the `sla_aware` option
+
+There are some nuances around the `sla_aware` option that users should be aware of:
+
+- SLA-aware updates work in tandem with maintenance. Draining a host that has an instance of the
+job being updated affects the SLA and thus will be taken into account when the update determines
+whether or not it is safe to update another instance.
+- SLA-aware updates will use the [SLAPolicy](../features/sla-requirements.md#custom-sla) of the
+*newest* configuration when determining whether or not it is safe to update an instance. For
+example, if the current configuration specifies a
+[PercentageSlaPolicy](../features/sla-requirements.md#percentageslapolicy-objects) that allows for
+5% of instances to be down and the updated configuration increaes this value to 10%, the SLA
+calculation will be done using the 10% policy. Be mindful of this when doing an update that
+modifies the `SLAPolicy` since it may be possible to put the old configuration in a bad state
+that the new configuration would not be affected by. Additionally, if the update is rolled back,
+then the rollback will use the old `SLAPolicy` (or none if there was not one previously).
+- If using the [CoordinatorSlaPolicy](../features/sla-requirements.md#coordinatorslapolicy-objects),
+it is important to pay attention to the `batch_size` of the update. If you have a complex SLA
+requirement, then you may be limiting the throughput of your updates with an insufficient
+`batch_size`. For example, imagine you have a job with 9 instance that represents three
+replicated caches, and you can only update one instance per replica set: `[0 1 2]
+[3 4 5] [6 7 8]` (the number indicates the instance ID and the brackets represent replica
+sets). If your `batch_size` is 3, then you will slowly update one replica set at a time. If your
+`batch_size` is 9, then you can update all replica sets in parallel and thus speeding up the update.
+- If an instance fails an SLA check for an update, then it will be rechecked starting at a delay
+from `sla_aware_kill_retry_min_delay` and exponentially increasing up to
+`sla_aware_kill_retry_max_delay`. These are cluster-operator set values.
 
 ### HealthCheckConfig Objects
 

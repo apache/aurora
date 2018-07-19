@@ -32,7 +32,6 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
-import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.updater.strategy.BatchStrategy;
@@ -43,7 +42,7 @@ import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import static org.apache.aurora.scheduler.base.Numbers.toRange;
+import static org.apache.aurora.scheduler.updater.Updates.getConfig;
 
 /**
  * A factory that produces job updaters based on a job update configuration.
@@ -138,21 +137,6 @@ interface UpdateFactory {
     @VisibleForTesting
     static Set<Integer> expandInstanceIds(Set<IInstanceTaskConfig> instanceGroups) {
       return Updates.getInstanceIds(instanceGroups).asSet(DiscreteDomain.integers());
-    }
-
-    private static Optional<ITaskConfig> getConfig(
-        int id,
-        Set<IInstanceTaskConfig> instanceGroups) {
-
-      for (IInstanceTaskConfig group : instanceGroups) {
-        for (IRange range : group.getInstances()) {
-          if (toRange(range).contains(id)) {
-            return Optional.of(group.getTask());
-          }
-        }
-      }
-
-      return Optional.empty();
     }
   }
 

@@ -142,7 +142,7 @@ public class TaskHistoryPruner implements EventSubscriber {
   }
 
   private void deleteTasks(final Set<String> taskIds) {
-    LOG.info("Pruning inactive tasks " + taskIds);
+    LOG.debug("Pruning inactive tasks {}", taskIds);
     batchWorker.execute(storeProvider -> {
       stateManager.deleteTasks(storeProvider, taskIds);
       return BatchWorker.NO_RESULT;

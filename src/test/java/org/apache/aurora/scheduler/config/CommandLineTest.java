@@ -169,6 +169,9 @@ public class CommandLineTest {
     expected.zk.digestCredentials = "testing";
     expected.updater.enableAffinity = true;
     expected.updater.affinityExpiration = TEST_TIME;
+    expected.updater.slaAwareActionMaxBatchSize = 42;
+    expected.updater.slaAwareKillRetryMinDelay = new TimeAmount(42, Time.DAYS);
+    expected.updater.slaAwareKillRetryMaxDelay = new TimeAmount(42, Time.DAYS);
     expected.state.taskAssignerModules = ImmutableList.of(NoopModule.class);
     expected.snapshot.snapshotInterval = TEST_TIME;
     expected.logPersistence.maxLogEntrySize = TEST_DATA;
@@ -320,6 +323,9 @@ public class CommandLineTest {
         "-zk_digest_credentials=testing",
         "-enable_update_affinity=true",
         "-update_affinity_reservation_hold_time=42days",
+        "-sla_aware_action_max_batch_size=42",
+        "-sla_aware_kill_retry_min_delay=42days",
+        "-sla_aware_kill_retry_max_delay=42days",
         "-task_assigner_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
         "-dlog_snapshot_interval=42days",
         "-dlog_max_entry_size=42GB",

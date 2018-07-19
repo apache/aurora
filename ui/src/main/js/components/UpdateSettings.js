@@ -25,6 +25,10 @@ export default function UpdateSettings({ update }) {
         <td>Rollback On Failure?</td>
         <td>{settings.rollbackOnFailure ? 'yes' : 'no'}</td>
       </tr>
+      <tr>
+        <td>SLA-Aware?</td>
+        <td>{settings.slaAware ? 'yes' : 'no'}</td>
+      </tr>
     </table>
   </div>);
 }

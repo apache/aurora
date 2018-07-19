@@ -32,6 +32,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.CoordinatorSlaPolicy;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.ExplicitReconciliationSettings;
 import org.apache.aurora.gen.HostStatus;
@@ -149,6 +150,7 @@ import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.CREATE
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.CREATE_OR_UPDATE_CRON;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.DRAIN_HOSTS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.END_MAINTENANCE;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.INVALID_SLA_AWARE_UPDATE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.KILL_TASKS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAINTENANCE_STATUS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
@@ -561,11 +563,23 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private IScheduledTask buildTaskForJobUpdate(int instanceId, String executorData) {
+    return buildTaskForJobUpdate(
+        instanceId,
+        executorData,
+        Optional.of(SlaPolicy.coordinatorSlaPolicy(
+            new CoordinatorSlaPolicy("test-url", "test-key"))));
+  }
+
+  private IScheduledTask buildTaskForJobUpdate(int instanceId,
+                                               String executorData,
+                                               Optional<SlaPolicy> slaPolicy) {
+
     return IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setInstanceId(instanceId)
             .setTask(populatedTask()
                 .setIsService(true)
+                .setSlaPolicy(slaPolicy.orElse(null))
                 .setExecutorConfig(new ExecutorConfig().setName(EXECUTOR_NAME)
                     .setData(executorData)))));
   }
@@ -1745,6 +1759,27 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsWhenSlaAwareWithNoPolicy() throws Exception {
+    IScheduledTask oldTask = buildTaskForJobUpdate(0, "old");
+    ITaskConfig newTask = buildTaskForJobUpdate(0, "new", Optional.empty())
+        .getAssignedTask()
+        .getTask();
+
+    IJobUpdate update = buildJobUpdate(
+        1,
+        newTask,
+        ImmutableMap.of(oldTask.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 0))),
+        buildJobUpdateSettings().setSlaAware(true));
+
+    control.replay();
+
+    JobUpdateRequest request = buildJobUpdateRequest(update);
+    Response response = thrift.startJobUpdate(request, AUDIT_MESSAGE);
+    assertEquals(invalidResponse(INVALID_SLA_AWARE_UPDATE), response);
+    assertEquals(0L, statsProvider.getLongValue(START_JOB_UPDATE));
+  }
+
+  @Test
   public void testPauseJobUpdateByCoordinator() throws Exception {
     expectGetRemoteUser();
     jobUpdateController.pause(UPDATE_KEY, AUDIT);
@@ -1956,6 +1991,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       ITaskConfig newConfig,
       ImmutableMap<ITaskConfig, ImmutableSet<Range>> oldConfigMap) {
 
+    return buildJobUpdate(instanceCount, newConfig, oldConfigMap, buildJobUpdateSettings());
+  }
+
+  private static IJobUpdate buildJobUpdate(
+      int instanceCount,
+      ITaskConfig newConfig,
+      ImmutableMap<ITaskConfig, ImmutableSet<Range>> oldConfigMap,
+      JobUpdateSettings jobUpdateSettings) {
+
     ImmutableSet.Builder<InstanceTaskConfig> builder = ImmutableSet.builder();
     for (Map.Entry<ITaskConfig, ImmutableSet<Range>> entry : oldConfigMap.entrySet()) {
       builder.add(new InstanceTaskConfig(entry.getKey().newBuilder(), entry.getValue()));
@@ -1967,7 +2011,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setUser(IDENTITY.getUser())
             .setMetadata(METADATA))
         .setInstructions(new JobUpdateInstructions()
-            .setSettings(buildJobUpdateSettings())
+            .setSettings(jobUpdateSettings)
             .setDesiredState(new InstanceTaskConfig()
                 .setTask(newConfig.newBuilder())
                 .setInstances(ImmutableSet.of(new Range(0, instanceCount - 1))))

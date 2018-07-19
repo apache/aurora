@@ -13,16 +13,22 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableRangeSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IRange;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
+import static org.apache.aurora.scheduler.base.Numbers.toRange;
 
 /**
  * Utility functions for job updates.
@@ -54,5 +60,30 @@ public final class Updates {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Get the config from a set of {@link IInstanceTaskConfig} for a given instance ID if it exists.
+   */
+  public static Optional<ITaskConfig> getConfig(
+      int id,
+      Set<IInstanceTaskConfig> instanceGroups) {
+
+    for (IInstanceTaskConfig group : instanceGroups) {
+      for (IRange range : group.getInstances()) {
+        if (toRange(range).contains(id)) {
+          return Optional.of(group.getTask());
+        }
+      }
+    }
+
+    return Optional.empty();
+  }
+
+  /**
+   * Get the lastest {@link JobUpdateStatus} for an update.
+   */
+  static JobUpdateStatus getJobUpdateStatus(IJobUpdateDetails jobUpdateDetails) {
+    return Iterables.getLast(jobUpdateDetails.getUpdateEvents()).getStatus();
   }
 }

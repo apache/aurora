@@ -30,7 +30,8 @@ export class InstanceEvent extends React.Component {
           getClassForUpdateAction(e.action),
           (i === events.length - 1) ? ' active' : ''),
         state: UPDATE_ACTION[e.action],
-        timestamp: e.timestampMs
+        timestamp: e.timestampMs,
+        message: e.message
       };
     });
 

@@ -21,6 +21,20 @@
 
   Note: The `Coordinator` interface required for the `CoordinatorSlaPolicy` is experimental at
   this juncture and is bound to change in the future.
+- Introduced ability for updates to be 'SLA-aware', or only update instances if it is within SLA,
+  using the new `sla_aware` field in `UpdateConfig`. See the bullet point above for an explanation
+  of custom SLA requirements.
+
+  **NOTE**: SLA-aware updates will use the desired config's SLA, not the existing config.
+
+  Three additional scheduler options have been added to support this feature:
+
+    1. `max_update_action_batch_size (default: 300)`: the number of update actions to process in a
+    batch.
+    2. `sla_aware_kill_retry_min_delay (default: 1mins)`: the minimum amount of time to wait before
+    retrying an SLA-aware kill (using a truncated binary backoff).
+    3. `sla_aware_kill_retry_max_delay (default: 5mins)`: the maximum amount of time to wait before
+    retrying an SLA-aware kill (using a truncated binary backoff).
 
 ### Deprecations and removals:
 

@@ -222,6 +222,12 @@ Optional flags:
 	Path to shiro.ini for authentication and authorization configuration.
 -shiro_realm_modules (default [class org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule])
 	Guice modules for configuring Shiro Realms.
+-sla_aware_action_max_batch_size (default 300) [must be > 0]
+	The maximum number of sla aware update actions that can be processed in a batch.
+-sla_aware_kill_retry_min_delay (default (1, min)) [must be > 0]
+	The minimum amount of time to wait before retrying an SLA-aware kill (using a truncated binary backoff).
+-sla_aware_kill_retry_max_delay (default (5, min)) [must be > 0]
+	The maximum amount of time to wait before retrying an SLA-aware kill (using a truncated binary backoff).
 -sla_coordinator_timeout (default (1, min)) [must be > 0]
 	Timeout interval for communicating with Coordinator.
 -sla_non_prod_metrics (default [])

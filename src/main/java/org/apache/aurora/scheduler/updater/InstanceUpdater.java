@@ -31,6 +31,7 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.base.Tasks.isKillable;
 import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromResources;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
@@ -76,10 +77,6 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
     boolean wasKilling = task.getTaskEvents().stream()
         .anyMatch(event -> event.getStatus() == KILLING);
     return task.getStatus() != KILLING && wasKilling;
-  }
-
-  private static boolean isKillable(ScheduleStatus status) {
-    return Tasks.isActive(status) && status != KILLING;
   }
 
   private static boolean isTaskPresent(Optional<IScheduledTask> task) {

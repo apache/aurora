@@ -32,12 +32,15 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ISlaPolicy;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import static org.apache.aurora.scheduler.updater.Updates.getConfig;
 
 interface InstanceActionHandler {
 
@@ -48,7 +51,8 @@ interface InstanceActionHandler {
       StateManager stateManager,
       UpdateAgentReserver reserver,
       JobUpdateStatus status,
-      IJobUpdateKey key);
+      IJobUpdateKey key,
+      SlaKillController slaKillController) throws UpdateStateException;
 
   Logger LOG = LoggerFactory.getLogger(InstanceActionHandler.class);
 
@@ -90,7 +94,8 @@ interface InstanceActionHandler {
         StateManager stateManager,
         UpdateAgentReserver reserver,
         JobUpdateStatus status,
-        IJobUpdateKey key) {
+        IJobUpdateKey key,
+        SlaKillController slaKillController) {
 
       Optional<IScheduledTask> task = getExistingTask(storeProvider, instance);
       if (task.isPresent()) {
@@ -128,19 +133,38 @@ interface InstanceActionHandler {
         StateManager stateManager,
         UpdateAgentReserver reserver,
         JobUpdateStatus status,
-        IJobUpdateKey key) {
+        IJobUpdateKey key,
+        SlaKillController slaKillController) throws UpdateStateException {
 
       Optional<IScheduledTask> task = getExistingTask(storeProvider, instance);
       if (task.isPresent()) {
-        LOG.info("Killing " + instance + " while " + status);
-        stateManager.changeState(
-            storeProvider,
-            Tasks.id(task.get()),
-            Optional.empty(),
-            ScheduleStatus.KILLING,
-            Optional.of("Killed for job update " + key.getId()));
-        if (reserveForReplacement && task.get().getAssignedTask().isSetSlaveId()) {
-          reserver.reserve(task.get().getAssignedTask().getSlaveId(), instance);
+        Optional<ISlaPolicy> slaPolicy = getSlaPolicy(instance, status, instructions);
+        if (instructions.getSettings().isSlaAware() && slaPolicy.isPresent()) {
+          slaKillController.slaKill(
+              storeProvider,
+              instance,
+              task.get(),
+              key,
+              slaPolicy.get(),
+              status,
+              (MutableStoreProvider slaStoreProvider) -> killAndMaybeReserve(
+                  instance,
+                  slaStoreProvider,
+                  stateManager,
+                  reserver,
+                  status,
+                  key,
+                  task.get()));
+        } else {
+          killAndMaybeReserve(
+              instance,
+              storeProvider,
+              stateManager,
+              reserver,
+              status,
+              key,
+              task.get()
+          );
         }
       } else {
         // Due to async event processing it's possible to have a race between task event
@@ -149,6 +173,52 @@ interface InstanceActionHandler {
       }
       // A task state transition will trigger re-evaluation in this case, rather than a timer.
       return Optional.empty();
+    }
+
+    private void killAndMaybeReserve(
+        IInstanceKey instance,
+        MutableStoreProvider storeProvider,
+        StateManager stateManager,
+        UpdateAgentReserver reserver,
+        JobUpdateStatus status,
+        IJobUpdateKey key,
+        IScheduledTask task) {
+
+      LOG.info("Killing " + instance + " while " + status);
+      stateManager.changeState(
+          storeProvider,
+          Tasks.id(task),
+          Optional.empty(),
+          ScheduleStatus.KILLING,
+          Optional.of("Killed for job update " + key.getId()));
+      if (reserveForReplacement && task.getAssignedTask().isSetSlaveId()) {
+        reserver.reserve(task.getAssignedTask().getSlaveId(), instance);
+      }
+    }
+
+    /**
+     * Get the SLA policy that should be used to kill a task for an update. If the update is
+     * {@link JobUpdateStatus#ROLLING_FORWARD}, then we use the config we are updating to. If the
+     * update is {@link JobUpdateStatus#ROLLING_BACK}, then we use the config of the initial state.
+     */
+    private Optional<ISlaPolicy> getSlaPolicy(
+        IInstanceKey instance,
+        JobUpdateStatus status,
+        IJobUpdateInstructions instructions) throws UpdateStateException {
+
+      if (status == ROLLING_FORWARD) {
+        return Optional.ofNullable(instructions.getDesiredState().getTask().getSlaPolicy());
+      } else if (status == ROLLING_BACK) {
+        return getConfig(instance.getInstanceId(), instructions.getInitialState())
+            .map(ITaskConfig::getSlaPolicy);
+      } else {
+        // This should not happen as there checks before this method is called, but we throw an
+        // exception just in case.
+        LOG.error("Attempted to perform an SLA-aware kill on instance {} while update is not "
+            + "in an active state (it is in state {})", instance, status);
+        throw new UpdateStateException("Attempted to perform an instance update action while not "
+            + "in an active state.");
+      }
     }
   }
 
@@ -161,7 +231,8 @@ interface InstanceActionHandler {
         StateManager stateManager,
         UpdateAgentReserver reserver,
         JobUpdateStatus status,
-        IJobUpdateKey key) {
+        IJobUpdateKey key,
+        SlaKillController slaKillController) {
 
       return Optional.of(Amount.of(
           (long) instructions.getSettings().getMinWaitInInstanceRunningMs(),

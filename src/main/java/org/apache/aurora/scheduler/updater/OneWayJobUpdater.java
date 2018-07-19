@@ -179,8 +179,7 @@ class OneWayJobUpdater<K, T> {
         for (K instance : nextGroup) {
           builder.put(instance, instances.get(instance).evaluate(stateProvider.getState(instance)));
         }
-        LOG.info("Changed working set for update to "
-            + filterByStatus(instances, WORKING));
+        LOG.debug("Changed working set for update to " + filterByStatus(instances, WORKING));
       }
 
       Map<K, SideEffect> sideEffects = builder.build();
