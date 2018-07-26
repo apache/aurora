@@ -108,7 +108,6 @@ class JobUpdateHistoryPruner extends AbstractScheduledService {
   @Override
   protected void runOneIteration() {
     storage.write((NoResult.Quiet) storeProvider -> {
-
       List<IJobUpdateSummary> completedUpdates = storeProvider.getJobUpdateStore()
           .fetchJobUpdates(IJobUpdateQuery.build(
               new JobUpdateQuery().setUpdateStatuses(TERMINAL_STATES)))
@@ -120,12 +119,16 @@ class JobUpdateHistoryPruner extends AbstractScheduledService {
       Predicate<IJobUpdateSummary> expiredFilter =
           s -> s.getState().getCreatedTimestampMs() < cutoff;
 
+      // Set up a predicate to detect updates that have no tasks left in the store.
+      Set<IJobKey> currentJobs = storeProvider.getTaskStore().getJobKeys();
+      Predicate<IJobUpdateSummary> orphanFilter = u -> !currentJobs.contains(u.getKey().getJob());
+
       ImmutableSet.Builder<IJobUpdateKey> pruneBuilder = ImmutableSet.builder();
 
-      // Gather updates based on time threshold.
+      // Gather updates based on time threshold or ones that have been orphaned.
       pruneBuilder.addAll(completedUpdates
           .stream()
-          .filter(expiredFilter)
+          .filter(expiredFilter.or(orphanFilter))
           .map(IJobUpdateSummary::getKey)
           .collect(Collectors.toList()));
 
