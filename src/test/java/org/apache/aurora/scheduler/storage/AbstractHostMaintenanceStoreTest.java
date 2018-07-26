@@ -18,6 +18,9 @@ import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
 
 import org.apache.aurora.gen.CountSlaPolicy;
 import org.apache.aurora.gen.HostMaintenanceRequest;
@@ -31,8 +34,8 @@ import static org.junit.Assert.assertEquals;
 
 public abstract class AbstractHostMaintenanceStoreTest {
 
-  private static final String HOST_A = "hostA";
-  private static final String HOST_B = "hostB";
+  protected static final String HOST_A = "hostA";
+  protected static final String HOST_B = "hostB";
 
   private static final SlaPolicy PERCENTAGE_SLA_POLICY = SlaPolicy.percentageSlaPolicy(
       new PercentageSlaPolicy()
@@ -46,7 +49,7 @@ public abstract class AbstractHostMaintenanceStoreTest {
           .setDurationSecs(1800)
   );
 
-  private static final IHostMaintenanceRequest HOST_A_MAINTENANCE_REQUEST =
+  protected static final IHostMaintenanceRequest HOST_A_MAINTENANCE_REQUEST =
       IHostMaintenanceRequest.build(new HostMaintenanceRequest()
           .setHost(HOST_A)
           .setDefaultSlaPolicy(PERCENTAGE_SLA_POLICY)
@@ -54,7 +57,7 @@ public abstract class AbstractHostMaintenanceStoreTest {
           .setTimeoutSecs(1800)
       );
 
-  private static final IHostMaintenanceRequest HOST_B_MAINTENANCE_REQUEST =
+  protected static final IHostMaintenanceRequest HOST_B_MAINTENANCE_REQUEST =
       IHostMaintenanceRequest.build(new HostMaintenanceRequest()
           .setHost(HOST_B)
           .setDefaultSlaPolicy(COUNT_SLA_POLICY)
@@ -62,14 +65,17 @@ public abstract class AbstractHostMaintenanceStoreTest {
           .setTimeoutSecs(1800)
       );
 
+  protected Injector injector;
   private Storage storage;
 
   @Before
   public void setUp() {
-    storage = createStorage();
+    injector = Guice.createInjector(getStorageModule());
+    storage = injector.getInstance(Storage.class);
+    storage.prepare();
   }
 
-  protected abstract Storage createStorage();
+  protected abstract Module getStorageModule();
 
   @Test
   public void testReadHostMaintenanceRequestNonExistant() {
@@ -135,7 +141,7 @@ public abstract class AbstractHostMaintenanceStoreTest {
     assertEquals(Optional.empty(), read(HOST_A));
   }
 
-  private void insert(IHostMaintenanceRequest hostMaintenanceRequest) {
+  protected void insert(IHostMaintenanceRequest hostMaintenanceRequest) {
     storage.write(
         store -> {
           store.getHostMaintenanceStore().saveHostMaintenanceRequest(hostMaintenanceRequest);
@@ -151,7 +157,7 @@ public abstract class AbstractHostMaintenanceStoreTest {
     return storage.read(store -> store.getHostMaintenanceStore().getHostMaintenanceRequests());
   }
 
-  private void truncate(String host) {
+  protected void truncate(String host) {
     storage.write(
         (Storage.MutateWork.NoResult.Quiet) store -> store
             .getHostMaintenanceStore()

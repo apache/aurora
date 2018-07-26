@@ -22,15 +22,18 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.primitives.Longs;
+import com.google.inject.Inject;
 
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateEvent;
@@ -48,12 +51,19 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import static java.util.Objects.requireNonNull;
 
 public class MemJobUpdateStore implements JobUpdateStore.Mutable {
+  @VisibleForTesting
+  static final String UPDATE_STORE_SIZE = "mem_storage_update_size";
 
   private static final Ordering<IJobUpdateDetails> REVERSE_LAST_MODIFIED_ORDER = Ordering.natural()
       .reverse()
       .onResultOf(u -> u.getUpdate().getSummary().getState().getLastModifiedTimestampMs());
 
   private final Map<IJobUpdateKey, IJobUpdateDetails> updates = Maps.newConcurrentMap();
+
+  @Inject
+  MemJobUpdateStore(StatsProvider statsProvider) {
+    statsProvider.makeGauge(UPDATE_STORE_SIZE, updates::size);
+  }
 
   @Timed("job_update_store_fetch_details_query")
   @Override

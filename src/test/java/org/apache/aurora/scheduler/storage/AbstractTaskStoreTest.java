@@ -100,7 +100,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   protected abstract Module getStorageModule();
 
   @Before
-  public void baseSetUp() {
+  public void setUp() {
     injector = Guice.createInjector(getStorageModule());
     storage = injector.getInstance(Storage.class);
     storage.prepare();

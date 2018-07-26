@@ -13,8 +13,11 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import java.io.IOException;
 import java.util.Optional;
+
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
 
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.junit.Before;
@@ -24,14 +27,17 @@ import static org.junit.Assert.assertEquals;
 
 public abstract class AbstractSchedulerStoreTest {
 
+  protected Injector injector;
   private Storage storage;
 
   @Before
-  public void setUp() throws IOException {
-    storage = createStorage();
+  public void setUp() {
+    injector = Guice.createInjector(getStorageModule());
+    storage = injector.getInstance(Storage.class);
+    storage.prepare();
   }
 
-  protected abstract Storage createStorage();
+  protected abstract Module getStorageModule();
 
   @Test
   public void testSchedulerStore() {

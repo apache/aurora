@@ -13,11 +13,13 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
 
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
@@ -30,19 +32,22 @@ import static org.junit.Assert.assertEquals;
 
 public abstract class AbstractQuotaStoreTest {
 
-  private static final String ROLE_A = "roleA";
-  private static final String ROLE_B = "roleB";
-  private static final IResourceAggregate QUOTA_A = ResourceTestUtil.aggregate(1.0, 2, 3);
-  private static final IResourceAggregate QUOTA_B = ResourceTestUtil.aggregate(2.0, 4, 6);
+  protected static final String ROLE_A = "roleA";
+  protected static final String ROLE_B = "roleB";
+  protected static final IResourceAggregate QUOTA_A = ResourceTestUtil.aggregate(1.0, 2, 3);
+  protected static final IResourceAggregate QUOTA_B = ResourceTestUtil.aggregate(2.0, 4, 6);
 
+  protected Injector injector;
   private Storage storage;
 
   @Before
-  public void setUp() throws IOException {
-    storage = createStorage();
+  public void setUp() {
+    injector = Guice.createInjector(getStorageModule());
+    storage = injector.getInstance(Storage.class);
+    storage.prepare();
   }
 
-  protected abstract Storage createStorage();
+  protected abstract Module getStorageModule();
 
   @Test
   public void testCrud() {
@@ -84,7 +89,7 @@ public abstract class AbstractQuotaStoreTest {
     assertQuotas(ImmutableMap.of(ROLE_A, QUOTA_B));
   }
 
-  private void save(String role, IResourceAggregate quota) {
+  protected void save(String role, IResourceAggregate quota) {
     storage.write(
         (NoResult.Quiet) storeProvider -> storeProvider.getQuotaStore().saveQuota(role, quota));
   }
@@ -100,12 +105,12 @@ public abstract class AbstractQuotaStoreTest {
     );
   }
 
-  private void delete(String role) {
+  protected void delete(String role) {
     storage.write(
         (NoResult.Quiet) storeProvider -> storeProvider.getQuotaStore().removeQuota(role));
   }
 
-  private void deleteAll() {
+  protected void deleteAll() {
     storage.write((NoResult.Quiet) storeProvider -> storeProvider.getQuotaStore().deleteQuotas());
   }
 }

@@ -18,14 +18,10 @@ import com.google.inject.Module;
 import com.google.inject.util.Modules;
 
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.scheduler.storage.AbstractAttributeStoreTest;
+import org.apache.aurora.scheduler.storage.AbstractSchedulerStoreTest;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
-import org.junit.Test;
 
-import static org.apache.aurora.scheduler.storage.mem.MemAttributeStore.ATTRIBUTE_STORE_SIZE;
-import static org.junit.Assert.assertEquals;
-
-public class MemAttributeStoreTest extends AbstractAttributeStoreTest {
+public class MemSchedulerStoreTest extends AbstractSchedulerStoreTest {
 
   private FakeStatsProvider statsProvider;
 
@@ -40,16 +36,5 @@ public class MemAttributeStoreTest extends AbstractAttributeStoreTest {
             bind(StatsProvider.class).toInstance(statsProvider);
           }
         });
-  }
-
-  @Test
-  public void testStoreSize() {
-    assertEquals(0L, statsProvider.getLongValue(ATTRIBUTE_STORE_SIZE));
-    insert(HOST_A_ATTRS);
-    assertEquals(1L, statsProvider.getLongValue(ATTRIBUTE_STORE_SIZE));
-    insert(HOST_B_ATTRS);
-    assertEquals(2L, statsProvider.getLongValue(ATTRIBUTE_STORE_SIZE));
-    truncate();
-    assertEquals(0L, statsProvider.getLongValue(ATTRIBUTE_STORE_SIZE));
   }
 }

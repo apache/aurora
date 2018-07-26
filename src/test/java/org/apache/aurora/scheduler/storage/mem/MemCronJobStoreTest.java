@@ -22,7 +22,7 @@ import org.apache.aurora.scheduler.storage.AbstractCronJobStoreTest;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.storage.mem.MemCronJobStore.CRON_JOBS_SIZE;
+import static org.apache.aurora.scheduler.storage.mem.MemCronJobStore.CRON_STORE_SIZE;
 import static org.junit.Assert.assertEquals;
 
 public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
@@ -44,12 +44,12 @@ public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
 
   @Test
   public void testStoreSize() {
-    assertEquals(0L, statsProvider.getLongValue(CRON_JOBS_SIZE));
+    assertEquals(0L, statsProvider.getLongValue(CRON_STORE_SIZE));
     saveAcceptedJob(JOB_A);
-    assertEquals(1L, statsProvider.getLongValue(CRON_JOBS_SIZE));
+    assertEquals(1L, statsProvider.getLongValue(CRON_STORE_SIZE));
     saveAcceptedJob(JOB_B);
-    assertEquals(2L, statsProvider.getLongValue(CRON_JOBS_SIZE));
+    assertEquals(2L, statsProvider.getLongValue(CRON_STORE_SIZE));
     deleteJobs();
-    assertEquals(0L, statsProvider.getLongValue(CRON_JOBS_SIZE));
+    assertEquals(0L, statsProvider.getLongValue(CRON_STORE_SIZE));
   }
 }

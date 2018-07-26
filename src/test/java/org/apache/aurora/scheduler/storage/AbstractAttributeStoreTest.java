@@ -13,11 +13,13 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
 
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
@@ -45,25 +47,28 @@ public abstract class AbstractAttributeStoreTest {
   private static final Attribute ATTR1 = new Attribute("attr1", ImmutableSet.of("a", "b", "c"));
   private static final Attribute ATTR2 = new Attribute("attr2", ImmutableSet.of("d", "e", "f"));
   private static final Attribute ATTR3 = new Attribute("attr3", ImmutableSet.of("a", "d", "g"));
-  private static final IHostAttributes HOST_A_ATTRS =
+  protected static final IHostAttributes HOST_A_ATTRS =
       IHostAttributes.build(new HostAttributes(HOST_A, ImmutableSet.of(ATTR1, ATTR2))
           .setSlaveId(SLAVE_A)
           .setAttributes(ImmutableSet.of())
           .setMode(MaintenanceMode.NONE));
-  private static final IHostAttributes HOST_B_ATTRS =
+  protected static final IHostAttributes HOST_B_ATTRS =
       IHostAttributes.build(new HostAttributes(HOST_B, ImmutableSet.of(ATTR2, ATTR3))
           .setSlaveId(SLAVE_B)
           .setAttributes(ImmutableSet.of())
           .setMode(MaintenanceMode.DRAINING));
 
+  protected Injector injector;
   private Storage storage;
 
   @Before
-  public void setUp() throws IOException {
-    storage = createStorage();
+  public void setUp() {
+    injector = Guice.createInjector(getStorageModule());
+    storage = injector.getInstance(Storage.class);
+    storage.prepare();
   }
 
-  protected abstract Storage createStorage();
+  protected abstract Module getStorageModule();
 
   @Test
   public void testSaveAttributes() {
@@ -170,7 +175,7 @@ public abstract class AbstractAttributeStoreTest {
     assertEquals(Optional.of(hostAUpdated), read(HOST_A));
   }
 
-  private boolean insert(IHostAttributes attributes) {
+  protected boolean insert(IHostAttributes attributes) {
     return storage.write(
         storeProvider -> storeProvider.getAttributeStore().saveHostAttributes(attributes));
   }
@@ -183,7 +188,7 @@ public abstract class AbstractAttributeStoreTest {
     return storage.read(storeProvider -> storeProvider.getAttributeStore().getHostAttributes());
   }
 
-  private void truncate() {
+  protected void truncate() {
     storage.write(
         (NoResult.Quiet) storeProvider -> storeProvider.getAttributeStore().deleteHostAttributes());
   }

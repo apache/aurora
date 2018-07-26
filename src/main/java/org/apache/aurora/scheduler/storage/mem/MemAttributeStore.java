@@ -17,11 +17,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.inject.Inject;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
@@ -32,7 +35,15 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
  * An in-memory attribute store.
  */
 class MemAttributeStore implements AttributeStore.Mutable {
+  @VisibleForTesting
+  static final String ATTRIBUTE_STORE_SIZE = "mem_storage_attribute_size";
+
   private final Map<String, IHostAttributes> hostAttributes = Maps.newConcurrentMap();
+
+  @Inject
+  MemAttributeStore(StatsProvider statsProvider) {
+    statsProvider.makeGauge(ATTRIBUTE_STORE_SIZE, hostAttributes::size);
+  }
 
   @Override
   public void deleteHostAttributes() {

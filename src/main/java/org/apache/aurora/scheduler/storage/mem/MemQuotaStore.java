@@ -16,9 +16,12 @@ package org.apache.aurora.scheduler.storage.mem;
 import java.util.Map;
 import java.util.Optional;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.inject.Inject;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
@@ -26,8 +29,15 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
  * An in-memory quota store.
  */
 class MemQuotaStore implements QuotaStore.Mutable {
+  @VisibleForTesting
+  static final String QUOTA_STORE_SIZE = "mem_storage_quota_size";
 
   private final Map<String, IResourceAggregate> quotas = Maps.newConcurrentMap();
+
+  @Inject
+  MemQuotaStore(StatsProvider statsProvider) {
+    statsProvider.makeGauge(QUOTA_STORE_SIZE, quotas::size);
+  }
 
   @Override
   public void deleteQuotas() {

@@ -34,13 +34,13 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
  */
 class MemCronJobStore implements CronJobStore.Mutable {
   @VisibleForTesting
-  static final String CRON_JOBS_SIZE = "mem_storage_cron_size";
+  static final String CRON_STORE_SIZE = "mem_storage_cron_size";
 
   private final Map<IJobKey, IJobConfiguration> jobs = Maps.newConcurrentMap();
 
   @Inject
   MemCronJobStore(StatsProvider statsProvider) {
-    statsProvider.makeGauge(CRON_JOBS_SIZE, () -> jobs.size());
+    statsProvider.makeGauge(CRON_STORE_SIZE, jobs::size);
   }
 
   @Timed("mem_storage_cron_save_accepted_job")

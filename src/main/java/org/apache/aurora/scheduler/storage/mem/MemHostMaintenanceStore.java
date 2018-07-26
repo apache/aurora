@@ -17,16 +17,27 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import javax.inject.Inject;
+
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.storage.HostMaintenanceStore;
 import org.apache.aurora.scheduler.storage.entities.IHostMaintenanceRequest;
 
 public class MemHostMaintenanceStore implements HostMaintenanceStore.Mutable {
+  @VisibleForTesting
+  static final String MAINTENANCE_STORE_SIZE = "mem_storage_maintenance_size";
 
   private final Map<String, IHostMaintenanceRequest> hostMaintenanceRequests =
       Maps.newConcurrentMap();
+
+  @Inject
+  MemHostMaintenanceStore(StatsProvider statsProvider) {
+    statsProvider.makeGauge(MAINTENANCE_STORE_SIZE, hostMaintenanceRequests::size);
+  }
 
   @Override
   public Optional<IHostMaintenanceRequest> getHostMaintenanceRequest(String host) {
