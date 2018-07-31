@@ -2,7 +2,7 @@
 
 First things first, you'll need the source! The Aurora source is available from Apache git:
 
-    git clone https://git-wip-us.apache.org/repos/asf/aurora
+    git clone https://gitbox.apache.org/repos/asf/aurora
 
 Read the Style Guides
 ---------------------

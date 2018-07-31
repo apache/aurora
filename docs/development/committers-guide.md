@@ -29,7 +29,7 @@ and that key will need to be added to our KEYS file as well.
 
 2. Add your gpg key to the Apache Aurora KEYS file:
 
-               git clone https://git-wip-us.apache.org/repos/asf/aurora.git
+               git clone https://gitbox.apache.org/repos/asf/aurora
                (gpg --list-sigs <KEY ID> && gpg --armor --export <KEY ID>) >> KEYS
                git add KEYS && git commit -m "Adding gpg key for <APACHE ID>"
                ./rbt post -o -g
