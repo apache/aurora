@@ -290,7 +290,7 @@ class ProcessBase(object):
       try:
         self.execute()
       except Exception as e:
-        self._log('Error trying to execute %s: %s' % (self._name, e))
+        self._log('Error trying to execute %s: %s' % (self._name, e), exc_info=True)
         raise e
       finally:
         self._ckpt.close()
