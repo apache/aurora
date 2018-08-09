@@ -71,7 +71,8 @@ def test_create(chmod, chown, getpwnam, getgrgid):
   getpwnam.assert_called_with('cletus')
   getgrgid.assert_called_with(123)
 
-  chown.assert_called_with(ds.root, 456, 123)
+  chown.assert_any_call(mesos_dir, 456, 123)
+  chown.assert_any_call(ds.root, 456, 123)
   chmod.assert_called_with(ds.root, 0700)
 
 

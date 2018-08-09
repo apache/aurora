@@ -572,7 +572,9 @@ test_scp_permissions() {
   # Unset because we are expecting an error
   set +e
 
-  _sandbox_contents=$(aurora task scp $_filename ${_jobkey}:../ 2>&1 > /dev/null)
+  # $_filename is a path relative to "/var/lib/mesos/slaves/x/frameworks/y/executors/z/runs/latest/sandbox".
+  # We shouldn't have write permissions outside of the "/latest" executor scratch dir created by Mesos.
+  _sandbox_contents=$(aurora task scp $_filename ${_jobkey}:../../ 2>&1 > /dev/null)
   _retcode=$?
 
   # Reset -e after command has been run

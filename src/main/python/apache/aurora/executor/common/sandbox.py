@@ -138,6 +138,15 @@ class DirectorySandbox(SandboxInterface):
       pwent, grent = self.get_user_and_group()
 
       try:
+        # Mesos provides a sandbox directory with permission 0750 owned by the user of the executor.
+        # In case of Thermos this is `root`, as Thermos takes the responsibility to drop
+        # privileges to the designated non-privileged user/role. To ensure non-provileged processes
+        # can still read their sandbox, Thermos must also update the permissions of the scratch
+        # directory created by Mesos.
+        # This is necessary since Mesos 1.6.0 (https://issues.apache.org/jira/browse/MESOS-8332).
+        log.debug('DirectorySandbox: chown %s:%s %s' % (self._user, grent.gr_name, self._mesos_dir))
+        os.chown(self._mesos_dir, pwent.pw_uid, pwent.pw_gid)
+
         log.debug('DirectorySandbox: chown %s:%s %s' % (self._user, grent.gr_name, self.root))
         os.chown(self.root, pwent.pw_uid, pwent.pw_gid)
         log.debug('DirectorySandbox: chmod 700 %s' % self.root)
