@@ -239,7 +239,6 @@ class ThermosTaskRunner(TaskRunner):
 
   def _cmdline(self):
     params = dict(log_dir=LogOptions.log_dir(),
-                  log_to_disk='DEBUG',
                   checkpoint_root=self._checkpoint_root,
                   sandbox=self._sandbox.root,
                   container_sandbox=self._sandbox.container_root,

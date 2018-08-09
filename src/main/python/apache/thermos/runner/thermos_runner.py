@@ -21,6 +21,7 @@ import sys
 import traceback
 
 from twitter.common import app, log
+from twitter.common.log.options import LogOptions
 
 from apache.thermos.common.excepthook import ExceptionTerminationHandler
 from apache.thermos.common.options import add_port_to
@@ -264,6 +265,9 @@ def proxy_main(args, opts):
 def main(args, opts):
   return proxy_main(args, opts)
 
+
+LogOptions.set_simple(True)
+LogOptions.set_disk_log_level('DEBUG')
 
 app.register_module(ExceptionTerminationHandler())
 app.main()
