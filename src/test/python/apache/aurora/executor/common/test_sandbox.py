@@ -31,6 +31,14 @@ from apache.aurora.executor.common.sandbox import (
 from gen.apache.aurora.api.ttypes import AssignedTask, Container, DockerContainer, TaskConfig
 
 
+def test_sandbox_root_path():
+  with temporary_dir() as d:
+    mesos_dir = os.path.join(d, 'task1')
+    ds = DirectorySandbox(mesos_dir)
+
+    assert os.path.join(mesos_dir, DirectorySandbox.SANDBOX_NAME) == ds.root
+
+
 def test_directory_sandbox():
   with temporary_dir() as d:
     ds1 = DirectorySandbox(os.path.join(d, 'task1'))
@@ -55,16 +63,16 @@ def test_create(chmod, chown, getpwnam, getgrgid):
   getpwnam.return_value.pw_gid = 123
   getpwnam.return_value.pw_uid = 456
 
-  with temporary_dir() as d:
-    real_path = os.path.join(d, 'sandbox')
-    ds = DirectorySandbox(real_path, 'cletus')
+  with temporary_dir() as mesos_dir:
+    ds = DirectorySandbox(mesos_dir, 'cletus')
     ds.create()
-    assert os.path.exists(real_path)
+    assert os.path.exists(ds.root)
 
   getpwnam.assert_called_with('cletus')
   getgrgid.assert_called_with(123)
-  chown.assert_called_with(real_path, 456, 123)
-  chmod.assert_called_with(real_path, 0700)
+
+  chown.assert_called_with(ds.root, 456, 123)
+  chmod.assert_called_with(ds.root, 0700)
 
 
 @mock.patch('grp.getgrgid')
@@ -73,10 +81,9 @@ def test_create(chmod, chown, getpwnam, getgrgid):
 @mock.patch('os.chmod')
 def test_create_no_user(*args):
   with temporary_dir() as d:
-    real_path = os.path.join(d, 'sandbox')
-    ds = DirectorySandbox(real_path)
+    ds = DirectorySandbox(d)
     ds.create()
-    assert os.path.exists(real_path)
+    assert os.path.exists(ds.root)
 
   for mocked in args:
     mocked.assert_not_called()
@@ -95,8 +102,7 @@ def test_user_does_not_exist(getpwnam):
   getpwnam.side_effect = KeyError('johndoe')
 
   with temporary_dir() as d:
-    real_path = os.path.join(d, 'sandbox')
-    ds = DirectorySandbox(real_path, 'cletus')
+    ds = DirectorySandbox(d, 'cletus')
     with pytest.raises(DirectorySandbox.CreationError):
       ds.create()
 
@@ -108,8 +114,7 @@ def test_create_ioerror(chown):
   chown.side_effect = IOError('Disk is borked')
 
   with temporary_dir() as d:
-    real_path = os.path.join(d, 'sandbox')
-    ds = DirectorySandbox(real_path)
+    ds = DirectorySandbox(d)
     with pytest.raises(DirectorySandbox.CreationError):
       ds.create()
 
@@ -123,16 +128,14 @@ def test_docker_directory_sandbox_create_ioerror(makedirs):
     'MESOS_SANDBOX': 'some-sandbox'
   }):
     with temporary_dir() as d:
-      real_path = os.path.join(d, 'sandbox')
-      ds = DockerDirectorySandbox(real_path)
+      ds = DockerDirectorySandbox(d)
       with pytest.raises(DirectorySandbox.CreationError):
         ds.create()
 
 
 def test_destroy_ioerror():
   with temporary_dir() as d:
-    real_path = os.path.join(d, 'sandbox')
-    ds = DirectorySandbox(real_path)
+    ds = DirectorySandbox(d)
     ds.create()
 
     with mock.patch('shutil.rmtree') as shutil_rmtree:
@@ -148,10 +151,7 @@ MOCK_MESOS_DIRECTORY = '/some/path'
 @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
 def test_verify_group_match(mock_check_output):
   with temporary_dir() as d:
-    sandbox = FileSystemImageSandbox(
-        os.path.join(d, 'sandbox'),
-        user='someuser',
-        sandbox_mount_point='/some/path')
+    sandbox = FileSystemImageSandbox(d, user='someuser', sandbox_mount_point='/some/path')
 
     mock_check_output.return_value = 'test-group:x:2:'
 
@@ -184,9 +184,7 @@ def test_verify_network_files():
     os.makedirs(os.path.join(task_fs_path, 'etc'))
 
     with mock.patch.dict(os.environ, {'MESOS_DIRECTORY': d}):
-      sandbox = FileSystemImageSandbox(
-          os.path.join(d, 'sandbox'),
-          sandbox_mount_point='/some/sandbox/path')
+      sandbox = FileSystemImageSandbox(d, sandbox_mount_point='/some/sandbox/path')
 
       sandbox._copy_files()
 
@@ -332,7 +330,7 @@ def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call, mock_
   sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox')
 
   sandbox = FileSystemImageSandbox(
-      sandbox_directory,
+      MOCK_MESOS_DIRECTORY,
       user='someuser',
       no_create_user=True,
       mounted_volume_paths=['/some/container/path', '/some/other/container/path'],
@@ -375,10 +373,10 @@ def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call, mock_
 @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
 def test_filesystem_sandbox_no_volumes(mock_safe_mkdir, mock_check_call, mock_isfile):
   sandbox_mount_point = '/some/mount/point'
-  sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox'),
+  sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox')
 
   sandbox = FileSystemImageSandbox(
-      sandbox_directory,
+      MOCK_MESOS_DIRECTORY,
       user='someuser',
       no_create_user=True,
       mounted_volume_paths=None,
@@ -418,7 +416,7 @@ def test_filesystem_sandbox_mounts_paths_source_is_file(
   sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox')
 
   sandbox = FileSystemImageSandbox(
-      sandbox_directory,
+      MOCK_MESOS_DIRECTORY,
       user='someuser',
       no_create_user=True,
       mounted_volume_paths=['/some/path/to/file', '/some/path/to/directory'],
