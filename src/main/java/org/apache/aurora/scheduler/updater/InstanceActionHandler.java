@@ -207,7 +207,12 @@ interface InstanceActionHandler {
         IJobUpdateInstructions instructions) throws UpdateStateException {
 
       if (status == ROLLING_FORWARD) {
-        return Optional.ofNullable(instructions.getDesiredState().getTask().getSlaPolicy());
+        // It is possible that an update only removes instances. In this case, there is no desired
+        // state. Otherwise, get the task associated (this should never be null) and return an
+        // optional of the SlaPolicy of the task (or empty if null).
+        return Optional
+            .ofNullable(instructions.getDesiredState())
+            .map(desiredState -> desiredState.getTask().getSlaPolicy());
       } else if (status == ROLLING_BACK) {
         return getConfig(instance.getInstanceId(), instructions.getInitialState())
             .map(ITaskConfig::getSlaPolicy);
