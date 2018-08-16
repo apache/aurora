@@ -223,7 +223,7 @@ assert_active_update_state() {
   fi
 }
 
-assert_update_id_state() {
+assert_update_state_by_id() {
   # Assert that a given update ID is in an expected state
   local _jobkey=$1 _update_id=$2 _expected_state=$3
 
@@ -317,7 +317,7 @@ test_update_add_only_kill_only() {
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
   aurora update wait $_jobkey $_update_id
-  assert_update_id_state $_jobkey $_update_id 'ROLLED_FORWARD'
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
   wait_until_task_counts $_jobkey 3 0
 
   # Update and kill 2 instances only
@@ -326,7 +326,7 @@ test_update_add_only_kill_only() {
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
   aurora update wait $_jobkey $_update_id
-  assert_update_id_state $_jobkey $_update_id 'ROLLED_FORWARD'
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
   wait_until_task_counts $_jobkey 1 0
 
   # Update and add 2 instances only
@@ -335,7 +335,7 @@ test_update_add_only_kill_only() {
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
   aurora update wait $_jobkey $_update_id
-  assert_update_id_state $_jobkey $_update_id 'ROLLED_FORWARD'
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
   wait_until_task_counts $_jobkey 3 0
 
   # Clean up
@@ -362,7 +362,7 @@ test_update() {
   aurora update wait $_jobkey $_update_id
 
   # Check that the update ended in ROLLED_FORWARD state.  Assumes the status is the last column.
-  assert_update_id_state $_jobkey $_update_id 'ROLLED_FORWARD'
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
 }
 
 test_update_fail() {
@@ -385,7 +385,7 @@ test_update_fail() {
   # || is so that we don't return an EXIT so that `trap collect_result` doesn't get triggered.
   aurora update wait $_jobkey $_update_id || echo $?
   # Making sure we rolled back due to a failed health check
-  assert_update_id_state $_jobkey $_update_id 'ROLLED_BACK'
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_BACK'
 }
 
 test_partition_awareness() {
