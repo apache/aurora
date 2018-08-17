@@ -213,12 +213,23 @@ test_restart() {
   aurora job restart --batch-size=2 --watch-secs=10 $_jobkey
 }
 
-assert_update_state() {
+assert_active_update_state() {
   local _jobkey=$1 _expected_state=$2
 
   local _state=$(aurora update list $_jobkey --status active | tail -n +2 | awk '{print $3}')
   if [[ $_state != $_expected_state ]]; then
     echo "Expected update to be in state $_expected_state, but found $_state"
+    exit 1
+  fi
+}
+
+assert_update_state_by_id() {
+  # Assert that a given update ID is in an expected state
+  local _jobkey=$1 _update_id=$2 _expected_state=$3
+
+  local _state=$(aurora update info $_jobkey $_update_id | grep 'Current status' | awk '{print $NF}')
+  if [[ $_state != $_expected_state ]]; then
+    echo "Update should have completed in $_expected_state state, but found $_state"
     exit 1
   fi
 }
@@ -294,30 +305,64 @@ wait_until_task_counts() {
   fi
 }
 
+test_update_add_only_kill_only() {
+  # Tests update functionality where we only add or kill instances
+  local _jobkey=$1 _config=$2 _cluster=$3
+  shift 3
+  local _extra_args="${@}"
+
+  # Create the initial update with 3 instances
+  aurora update start $_jobkey $_config $_extra_args --bind profile.instances=3
+  assert_active_update_state $_jobkey 'ROLLING_FORWARD'
+  local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
+      | tail -n +2 | awk '{print $2}')
+  aurora update wait $_jobkey $_update_id
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
+  wait_until_task_counts $_jobkey 3 0
+
+  # Update and kill 2 instances only
+  aurora update start $_jobkey $_config $_extra_args --bind profile.instances=1
+  assert_active_update_state $_jobkey 'ROLLING_FORWARD'
+  local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
+      | tail -n +2 | awk '{print $2}')
+  aurora update wait $_jobkey $_update_id
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
+  wait_until_task_counts $_jobkey 1 0
+
+  # Update and add 2 instances only
+  aurora update start $_jobkey $_config $_extra_args --bind profile.instances=3
+  assert_active_update_state $_jobkey 'ROLLING_FORWARD'
+  local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
+      | tail -n +2 | awk '{print $2}')
+  aurora update wait $_jobkey $_update_id
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
+  wait_until_task_counts $_jobkey 3 0
+
+  # Clean up
+  aurora job killall $_jobkey
+}
+
 test_update() {
+  # Tests generic update functionality like pausing and resuming
   local _jobkey=$1 _config=$2 _cluster=$3
   shift 3
   local _extra_args="${@}"
 
   aurora update start $_jobkey $_config $_extra_args
-  assert_update_state $_jobkey 'ROLLING_FORWARD'
+  assert_active_update_state $_jobkey 'ROLLING_FORWARD'
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
   aurora_admin scheduler_snapshot devcluster
   sudo systemctl restart aurora-scheduler
-  assert_update_state $_jobkey 'ROLLING_FORWARD'
+  assert_active_update_state $_jobkey 'ROLLING_FORWARD'
   aurora update pause $_jobkey --message='hello'
-  assert_update_state $_jobkey 'ROLL_FORWARD_PAUSED'
+  assert_active_update_state $_jobkey 'ROLL_FORWARD_PAUSED'
   aurora update resume $_jobkey
-  assert_update_state $_jobkey 'ROLLING_FORWARD'
+  assert_active_update_state $_jobkey 'ROLLING_FORWARD'
   aurora update wait $_jobkey $_update_id
 
   # Check that the update ended in ROLLED_FORWARD state.  Assumes the status is the last column.
-  local status=$(aurora update info $_jobkey $_update_id | grep 'Current status' | awk '{print $NF}')
-  if [[ $status != "ROLLED_FORWARD" ]]; then
-    echo "Update should have completed in ROLLED_FORWARD state"
-    exit 1
-  fi
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
 }
 
 test_update_fail() {
@@ -327,7 +372,7 @@ test_update_fail() {
 
   # Make sure our updates works.
   aurora update start $_jobkey $_config $_extra_args
-  assert_update_state $_jobkey 'ROLLING_FORWARD'
+  assert_active_update_state $_jobkey 'ROLLING_FORWARD'
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
   # Need to wait until udpate finishes before we can start one that we want to fail.
@@ -339,12 +384,8 @@ test_update_fail() {
       | tail -n +2 | awk '{print $2}')
   # || is so that we don't return an EXIT so that `trap collect_result` doesn't get triggered.
   aurora update wait $_jobkey $_update_id || echo $?
-  # Making sure we rolled back.
-  local status=$(aurora update info $_jobkey $_update_id | grep 'Current status' | awk '{print $NF}')
-  if [[ $status != "ROLLED_BACK" ]]; then
-    echo "Update should have completed in ROLLED_BACK state due to failed healthcheck."
-    exit 1
-  fi
+  # Making sure we rolled back due to a failed health check
+  assert_update_state_by_id $_jobkey $_update_id 'ROLLED_BACK'
 }
 
 test_partition_awareness() {
@@ -665,6 +706,7 @@ test_http_example() {
   test_thermos_profile $_jobkey
   test_file_mount $_cluster $_role $_env $_job
   test_restart $_jobkey
+  test_update_add_only_kill_only $_jobkey $_base_config $_cluster $_bind_parameters
   test_update $_jobkey $_updated_config $_cluster $_bind_parameters
   test_update_fail $_jobkey $_base_config  $_cluster $_bad_healthcheck_config $_bind_parameters
   # Running test_update second time to change state to success.

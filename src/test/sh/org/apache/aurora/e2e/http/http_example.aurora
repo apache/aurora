@@ -18,6 +18,7 @@ class DefaultProfile(Struct):
   role=Default(String, getpass.getuser())
   cmd=Default(String, 'cp /vagrant/src/test/sh/org/apache/aurora/e2e/http_example.py .')
   gpu=Default(Integer, 0)
+  instances=Default(Integer, 1)
 
 
 ContainerProfile = DefaultProfile(
@@ -115,7 +116,7 @@ shell_health_check_config = HealthCheckConfig(
 
 job = Service(
   cluster = 'devcluster',
-  instances = 1,
+  instances = '{{profile.instances}}',
   update_config = update_config,
   health_check_config = health_check_config,
   task = test_task,
