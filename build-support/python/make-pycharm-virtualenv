@@ -20,40 +20,35 @@ BUILDROOT=$HERE/../..
 VENV_DIR=build-support/python/pycharm.venv
 PROJECT_NAME=${PWD##*/}
 
+function read_pants_option() {
+  local -r scope="$1"
+  local -r name="$2"
+
+  ./pants options --output-format=json --scope="${scope}" --name="${name}" | python <(cat << EOF
+import json, sys
+
+print(json.load(sys.stdin)["${scope}.${name}"]["value"])
+EOF
+)
+}
+
 pushd "$BUILDROOT"
   ./pants dependencies --external-only src/test/python:: | sort -u > requirements.txt
   ./pants setup-py api/src/main/thrift/org/apache/aurora/gen
   ./pants setup-py api/src/main/thrift/org/apache/thermos
 
-  # Here we grab the version of pytest libs used by pants in a fairly awkward way.
-  # TODO(John Sirois): Either get this info from the current pants install itself instead of
-  # using a parallel ephemeral install like we do here (slow), or else invert things and
-  # allow user-control of the pytest lib versions within reason.
-
-  #rm -rf "$VENV_DIR"
-  #./build-support/virtualenv "$VENV_DIR"
-  #source $VENV_DIR/bin/activate
-  #  python -m pip install pantsbuild.pants==$(./pants --version)
-  #  pytest_requirement=$(python -m pip freeze | grep pytest==)
-  #  pytest_cov_requirement=$(python -m pip freeze | grep pytest-cov==)
-  #deactivate
-  # TODO(wfarner): The above attempt to fetch pytest versions from pants stopped
-  # working with commit 0c177058.  As a workaround, manually specify the versions
-  # for now.
-  pytest_requirement='pytest==3.2.3'
-  pytest_cov_requirement='pytest-cov==2.5.1'
-
   rm -rf "$VENV_DIR"
   ./build-support/virtualenv "$VENV_DIR"
   source $VENV_DIR/bin/activate
-    # NOTE: PyCharm navigation (ctrl-click) doesn't work without --egg - it gets confused by
-    # the namespace packages in twitter.common.
-    python -m pip install --egg -r requirements.txt
-    python -m pip install --egg -f dist \
-      apache.aurora.thrift==$(< .auroraversion) \
+    python -m pip install -U pip
+    python -m pip install -r requirements.txt
+    python -m pip install -f dist \
+      apache.aurora.thrift==$(<.auroraversion) \
       apache.thermos.thrift==$(<.auroraversion)
     # Use same py.test version embedded into pants
-    python -m pip install $pytest_requirement $pytest_cov_requirement
+    python -m pip install \
+      $(read_pants_option pytest requirements) \
+      $(read_pants_option pytest cov_requirements)
   deactivate
 popd
 
