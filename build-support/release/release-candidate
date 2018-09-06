@@ -33,7 +33,7 @@ export GPG_TTY=${GPG_TTY:-$(tty)}
 
 rc_number=0
 override_version=''
-aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=aurora.git'
+aurora_git_web_url='https://gitbox.apache.org/repos/asf?p=aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 
 function print_help_and_exit {

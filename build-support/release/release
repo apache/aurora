@@ -24,7 +24,7 @@ set -o nounset
 # commits/tags.
 export GPG_TTY=${GPG_TTY:-$(tty)}
 
-aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=aurora.git'
+aurora_git_web_url='https://gitbox.apache.org/repos/asf?p=aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/release/aurora'
 aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 
