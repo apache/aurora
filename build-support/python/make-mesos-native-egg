@@ -4,7 +4,6 @@
 set -u -e
 
 MESOS_BASEURL=https://archive.apache.org/dist/mesos
-BOX_RAM_MB=$((8 * 1024))  # at least 4 GiB, needed to link libmesos
 BOX_CPUS=4
 
 usage() {
@@ -23,30 +22,10 @@ EOF
 setup_tempdir() {
   TMPDIR=$(mktemp -d -t make-mesos-eggs.XXXXX)
   cleanup() {
-    cd "$TMPDIR"
-    if [[ -f Vagrantfile ]]; then
-      vagrant destroy -f
-    fi
-    cd /
     rm -frv "$TMPDIR"
   }
   # TODO(ksweeney): Use atexit.sh from mesos and its superior handling of this cleanup idiom.
   trap cleanup EXIT
-}
-
-# Create a new vagrant box
-init_vagrant_box() {
-  local box_name=$1
-  cat > Vagrantfile <<EOF
-Vagrant.require_version ">= 1.5.0"
-Vagrant.configure("2") do |config|
-  config.vm.box = "$box_name"
-  config.vm.provider "virtualbox" do |vb|
-    vb.memory = "$BOX_RAM_MB"
-    vb.cpus = "$BOX_CPUS"
-  end
-end
-EOF
 }
 
 fetch_and_build_mesos() {
@@ -59,7 +38,7 @@ fetch_and_build_mesos() {
       ./configure --disable-java --enable-optimize
       export MAKEFLAGS="-j$BOX_CPUS"
       make
-      find . -name '*.egg' -exec cp -v {} /vagrant \\;
+      find . -name '*.egg' -exec cp -v {} /mesos-egg \\;
 EOF
 }
 
@@ -70,23 +49,24 @@ DEBIAN_JESSIE64_DEPENDENCIES=(
   libcurl4-nss-dev
   libsasl2-dev
   libsvn-dev
+  make
+  patch
   python-dev
   python-virtualenv
   zlib1g-dev
+  wget
 )
 build_debian_jessie64() {
   local mesos_version=$1 output_basedir=$2
   local python_outdir=$output_basedir/debian/jessie64/python
+  local image_name=debian:jessie-slim
+
   pushd "$TMPDIR"
-    # Using bento debian box due to debian/jessie64 not having
-    # guest additions installed. No guest additions = no /vagrant.
-    init_vagrant_box bento/debian-8.6
-    vagrant up
-    vagrant ssh <<EOF
+    docker run -i -v $(pwd):/mesos-egg $image_name bash <<EOF
       set -e -u
 
-      sudo apt-get update
-      sudo apt-get -y install ${DEBIAN_JESSIE64_DEPENDENCIES[*]}
+      apt-get update
+      apt-get -y install ${DEBIAN_JESSIE64_DEPENDENCIES[*]}
       $(fetch_and_build_mesos "$mesos_version")
 EOF
     mkdir -pv "$python_outdir"
@@ -95,22 +75,24 @@ EOF
 }
 
 UBUNTU_TRUSTY64_DEPENDENCIES=(
-  g++-4.8
+  g++
   libapr1-dev
   libcurl4-nss-dev
   libsasl2-dev
   libsvn-dev
+  make
+  patch
   python-dev
-  python-virtualenv
+  wget
   zlib1g-dev
 )
 build_ubuntu_trusty64() {
   local mesos_version=$1 output_basedir=$2
   local python_outdir=$output_basedir/ubuntu/trusty64/python
+  local image_name=ubuntu:trusty
+
   pushd "$TMPDIR"
-    init_vagrant_box ubuntu/trusty64
-    vagrant up
-    vagrant ssh <<EOF
+    docker run -i -v $(pwd):/mesos-egg $image_name bash <<EOF
       set -e -u
 
       sudo apt-get update
@@ -128,23 +110,24 @@ UBUNTU_XENIAL64_DEPENDENCIES=(
   libcurl4-nss-dev
   libsasl2-dev
   libsvn-dev
+  make
+  patch
   python-dev
   python-virtualenv
+  wget
   zlib1g-dev
 )
 build_ubuntu_xenial64() {
   local mesos_version=$1 output_basedir=$2
   local python_outdir=$output_basedir/ubuntu/xenial64/python
+  local image_name=ubuntu:xenial
+
   pushd "$TMPDIR"
-    # Using bento box due to ubuntu/xenial64
-    # not being configured properly for Vagrant
-    init_vagrant_box bento/ubuntu-16.04
-    vagrant up
-    vagrant ssh <<EOF
+    docker run -i -v $(pwd):/mesos-egg $image_name bash <<EOF
       set -e -u
 
-      sudo apt-get update
-      sudo apt-get -y install ${UBUNTU_XENIAL64_DEPENDENCIES[*]}
+      apt-get update
+      apt-get -y install ${UBUNTU_XENIAL64_DEPENDENCIES[*]}
       $(fetch_and_build_mesos "$mesos_version")
 EOF
     mkdir -pv "$python_outdir"
@@ -160,6 +143,7 @@ CENTOS6_X86_64_DEPENDENCIES=(
   devtoolset-2-gcc
   devtoolset-2-gcc-c++
   libcurl-devel
+  make
   patch
   python27-python-devel
   subversion-devel
@@ -168,20 +152,24 @@ CENTOS6_X86_64_DEPENDENCIES=(
 build_centos6() {
   local mesos_version=$1 output_basedir=$2
   local python_outdir=$output_basedir/centos/6/python
+  local image_name=centos:6
+
   pushd "$TMPDIR"
-    init_vagrant_box bento/centos-6.7
-    vagrant up
-    vagrant ssh <<EOF
+    docker run -i -v $(pwd):/mesos-egg $image_name bash <<EOF
     set -e -u
 
     # We need Software Collections for Python 2.7 (we dropped support for 2.6).
-    sudo yum -y install centos-release-SCL
+    # wget must get installed before everything else to fetch the additional repos.
+    yum -y install centos-release-SCL wget
 
     # Mesos requires gcc 4.8, which is available in devtools-2 on centos 6.
     # TODO(maxim): Consider using signed packages when/if available.
-    sudo wget http://people.centos.org/tru/devtools-2/devtools-2.repo -O /etc/yum.repos.d/devtools-2.repo
+    wget http://people.centos.org/tru/devtools-2/devtools-2.repo -O /etc/yum.repos.d/devtools-2.repo
 
-    sudo yum -y install ${CENTOS6_X86_64_DEPENDENCIES[*]}
+    yum -y install ${CENTOS6_X86_64_DEPENDENCIES[*]}
+    export CC=/opt/rh/devtoolset-2/root/usr/bin/gcc
+    export CPP=/opt/rh/devtoolset-2/root/usr/bin/cpp
+    export CXX=/opt/rh/devtoolset-2/root/usr/bin/c++
     scl enable devtoolset-2 bash
     scl enable python27 - <<EOS
         $(fetch_and_build_mesos "$mesos_version")
@@ -198,24 +186,26 @@ CENTOS7_X86_64_DEPENDENCIES=(
   cyrus-sasl-md5
   gcc-c++
   libcurl-devel
+  make
   patch
   python-devel
   subversion-devel
+  wget
   zlib-devel
 )
 build_centos7() {
   local mesos_version=$1 output_basedir=$2
   local python_outdir=$output_basedir/centos/7/python
-  mkdir -pv "$python_outdir"
+  local image_name=centos:7
+
   pushd "$TMPDIR"
-    init_vagrant_box bento/centos-7.1
-    vagrant up
-    vagrant ssh <<EOF
+    docker run -i -v $(pwd):/mesos-egg $image_name bash <<EOF
     set -e -u
 
-    sudo yum -y install ${CENTOS7_X86_64_DEPENDENCIES[*]}
+    yum -y install ${CENTOS7_X86_64_DEPENDENCIES[*]}
     $(fetch_and_build_mesos "$mesos_version")
 EOF
+    mkdir -pv "$python_outdir"
     cp -v mesos.executor*.egg "$python_outdir"
   popd
 }
