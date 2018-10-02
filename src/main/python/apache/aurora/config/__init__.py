@@ -111,18 +111,18 @@ class AuroraConfig(object):
   @classmethod
   def load(
         cls, filename, name=None, bindings=None,
-        select_cluster=None, select_role=None, select_env=None):
+        select_cluster=None, select_role=None, select_env=None, use_memoized_env=False):
     # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
-    env = AuroraConfigLoader.load(filename)
+    env = AuroraConfigLoader.load(filename, use_memoized_env)
     return cls.apply_plugins(
         cls(cls.pick(env, name, bindings, select_cluster, select_role, select_env)), env)
 
   @classmethod
   def load_json(
         cls, filename, name=None, bindings=None,
-        select_cluster=None, select_role=None, select_env=None):
+        select_cluster=None, select_role=None, select_env=None, use_memoized_env=False):
     # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
-    env = AuroraConfigLoader.load_json(filename)
+    env = AuroraConfigLoader.load_json(filename, use_memoized_env)
     return cls.apply_plugins(
         cls(cls.pick(env, name, bindings, select_cluster, select_role, select_env)), env)
 

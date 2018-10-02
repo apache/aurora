@@ -186,7 +186,9 @@ def get_config(jobname,
                bindings=(),
                select_cluster=None,
                select_role=None,
-               select_env=None):
+               select_env=None,
+               use_memoized_env=False):
+
   """Creates and returns a config object contained in the provided file."""
   loader = AnnotatedAuroraConfig.load_json if json else AnnotatedAuroraConfig.load
   return loader(config_file,
@@ -194,4 +196,5 @@ def get_config(jobname,
                 bindings,
                 select_cluster=select_cluster,
                 select_role=select_role,
-                select_env=select_env)
+                select_env=select_env,
+                use_memoized_env=use_memoized_env)

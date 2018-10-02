@@ -16,6 +16,7 @@ python_tests(
   name = 'config',
   sources = globs('*py'),
   dependencies = [
+    '3rdparty/python:mock',
     '3rdparty/python:requests-mock',
     '3rdparty/python:twitter.common.contextutil',
     'api/src/main/thrift/org/apache/aurora/gen',

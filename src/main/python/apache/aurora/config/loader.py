@@ -12,16 +12,20 @@
 # limitations under the License.
 #
 
+import hashlib
 import json
 import pkgutil
 
 from pystachio.config import Config as PystachioConfig
+from pystachio.config import FileExecutor, FilelikeExecutor
 
 from apache.aurora.config.schema import base as base_schema
 
 
 class AuroraConfigLoader(PystachioConfig):
   SCHEMA_MODULES = []
+  CACHED_ENV = dict()
+  CACHED_JSON = dict()
 
   @classmethod
   def assembled_schema(cls, schema_modules):
@@ -56,17 +60,59 @@ class AuroraConfigLoader(PystachioConfig):
     cls.register_schema(base_schema)
 
   @classmethod
-  def load(cls, loadable):
-    return cls.load_raw(loadable).environment
+  def gen_content_key(cls, loadable):
+    """
+    Generates a key for caching from the loadable
+    if supported.
+
+    Currently only FileExecutor and FilelikeExecutors are
+    supported.
+
+    For other loadables, the key will be None which will
+    skip memoizing and reload the configuration each time.
+    """
+    key = None
+    if FileExecutor.matches(loadable):
+      with open(loadable) as fp:
+        key = hashlib.md5(fp.read()).hexdigest()
+    elif FilelikeExecutor.matches(loadable):
+      key = hashlib.md5(loadable.read()).hexdigest()
+      loadable.seek(0)
+    return key
+
+  @classmethod
+  def load(cls, loadable, is_memoized=False):
+    if is_memoized:
+      env_key = cls.gen_content_key(loadable)
+      if env_key and env_key in cls.CACHED_ENV:
+        env = cls.CACHED_ENV[env_key]
+      else:
+        env = cls.load_raw(loadable).environment
+        if env_key is not None:
+          cls.CACHED_ENV[env_key] = env
+    else:
+      env = cls.load_raw(loadable).environment
+    return env
 
   @classmethod
   def load_raw(cls, loadable):
     return cls(loadable)
 
   @classmethod
-  def load_json(cls, filename):
-    with open(filename) as fp:
-      return cls.loads_json(fp.read())
+  def load_json(cls, filename, is_memoized=False):
+    if is_memoized:
+      env_key = cls.gen_content_key(filename)
+      if env_key and env_key in cls.CACHED_JSON:
+        json = cls.CACHED_JSON[env_key]
+      else:
+        with open(filename) as fp:
+          json = cls.loads_json(fp.read())
+        if env_key is not None:
+          cls.CACHED_JSON[env_key] = json
+    else:
+      with open(filename) as fp:
+        json = cls.loads_json(fp.read())
+    return json
 
   @classmethod
   def loads_json(cls, string):
