@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.updater.strategy;
 
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Ordering;
 
 /**
@@ -43,10 +43,9 @@ abstract class ActiveLimitedStrategy<T extends Comparable<T>> implements UpdateS
 
   @Override
   public final Set<T> getNextGroup(Set<T> idle, Set<T> active) {
-    return FluentIterable
-        .from(ordering.sortedCopy(doGetNextGroup(idle, active)))
+    return ordering.sortedCopy(doGetNextGroup(idle, active)).stream()
         .limit(Math.max(0, maxActive - active.size()))
-        .toSet();
+        .collect(Collectors.toSet());
   }
 
   /**

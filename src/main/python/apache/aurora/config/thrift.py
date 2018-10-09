@@ -18,12 +18,17 @@ import re
 from pystachio import Empty, Ref
 from twitter.common.lang import Compatibility
 
-from apache.aurora.config.schema.base import AppcImage as PystachioAppcImage
-from apache.aurora.config.schema.base import Container as PystachioContainer
-from apache.aurora.config.schema.base import CoordinatorSlaPolicy as PystachioCoordinatorSlaPolicy
-from apache.aurora.config.schema.base import CountSlaPolicy as PystachioCountSlaPolicy
-from apache.aurora.config.schema.base import DockerImage as PystachioDockerImage
-from apache.aurora.config.schema.base import PercentageSlaPolicy as PystachioPercentageSlaPolicy
+from apache.aurora.config.schema.base import(
+  AppcImage as PystachioAppcImage,
+  BatchUpdateStrategy as PystachioBatchUpdateStrategy,
+  Container as PystachioContainer,
+  CoordinatorSlaPolicy as PystachioCoordinatorSlaPolicy,
+  CountSlaPolicy as PystachioCountSlaPolicy,
+  DockerImage as PystachioDockerImage,
+  PercentageSlaPolicy as PystachioPercentageSlaPolicy,
+  QueueUpdateStrategy as PystachioQueueUpdateStrategy,
+  VariableBatchUpdateStrategy as PystachioVariableBatchUpdateStrategy
+)
 from apache.aurora.config.schema.base import (
     Docker,
     HealthCheckConfig,
@@ -36,6 +41,7 @@ from apache.thermos.config.loader import ThermosTaskValidator
 from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME, GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.apache.aurora.api.ttypes import (
     AppcImage,
+    BatchJobUpdateStrategy,
     Constraint,
     Container,
     CoordinatorSlaPolicy,
@@ -49,6 +55,7 @@ from gen.apache.aurora.api.ttypes import (
     Image,
     JobConfiguration,
     JobKey,
+    JobUpdateStrategy,
     LimitConstraint,
     MesosContainer,
     Metadata,
@@ -56,9 +63,11 @@ from gen.apache.aurora.api.ttypes import (
     PartitionPolicy,
     PercentageSlaPolicy,
     Resource,
+    QueueJobUpdateStrategy,
     SlaPolicy,
     TaskConfig,
     TaskConstraint,
+    VariableBatchJobUpdateStrategy,
     ValueConstraint,
     Volume
 )
@@ -179,6 +188,37 @@ def create_container_config(container):
     return Container(MesosContainer(image, volumes), None)
 
   raise InvalidConfig('If a container is specified it must set one type.')
+
+
+def create_update_strategy_config(update_strategy):
+  unwrapped = update_strategy.unwrap()
+  if unwrapped is Empty:
+    return JobUpdateStrategy(
+        queueStrategy=QueueJobUpdateStrategy(
+            groupSize=1),
+        batchStrategy=None,
+        varBatchStrategy=None)
+
+  if isinstance(unwrapped, PystachioQueueUpdateStrategy):
+    return JobUpdateStrategy(
+        queueStrategy=QueueJobUpdateStrategy(
+            groupSize=fully_interpolated(unwrapped.batch_size())),
+        batchStrategy=None,
+        varBatchStrategy=None)
+
+  if isinstance(unwrapped, PystachioBatchUpdateStrategy):
+    return JobUpdateStrategy(
+        queueStrategy=None,
+        batchStrategy=BatchJobUpdateStrategy(
+            groupSize=fully_interpolated(unwrapped.batch_size())),
+        varBatchStrategy=None)
+
+  if isinstance(unwrapped, PystachioVariableBatchUpdateStrategy):
+    return JobUpdateStrategy(
+        queueStrategy=None,
+        batchStrategy=None,
+        varBatchStrategy=VariableBatchJobUpdateStrategy(
+            groupSizes=fully_interpolated(unwrapped.batch_sizes())))
 
 
 def volumes_to_thrift(volumes):

@@ -52,6 +52,7 @@ no_python_task = Task(
 
 update_config = UpdateConfig(watch_secs=0, batch_size=2)
 update_config_watch_secs = UpdateConfig(watch_secs=10, batch_size=2)
+update_config_var_batch = UpdateConfig(update_strategy = VariableBatchUpdateStrategy(batch_sizes = [1,2]))
 # "I am going to fail" config.
 shell_config = ShellHealthChecker(
   # This shell validates two things:
@@ -84,6 +85,10 @@ jobs = [
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_watch_secs',
+    update_config = update_config_watch_secs
+  ).bind(profile=DefaultProfile()),
+  job(
+    name = 'http_example_var_batch_update',
     update_config = update_config_watch_secs
   ).bind(profile=DefaultProfile()),
   job(

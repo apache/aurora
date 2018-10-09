@@ -67,6 +67,7 @@ import org.apache.aurora.gen.SlaPolicy;
 import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.gen.VariableBatchJobUpdateStrategy;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.base.Query;
@@ -792,9 +793,33 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       return invalidRequest(NON_SERVICE_TASK);
     }
 
+    int totalInstancesFromGroups;
     JobUpdateSettings settings = requireNonNull(mutableRequest.getSettings());
-    if (settings.getUpdateGroupSize() <= 0) {
-      return invalidRequest(INVALID_GROUP_SIZE);
+
+    // Gracefully handle a client sending an update with an older thrift schema
+    // TODO(rdelvalle): Remove after version 0.22.0 ships
+    ThriftBackfill.backfillUpdateStrategy(settings);
+
+    // Keep old job schema in case we want to revert to a lower version of Aurora that doesn't
+    // support variable update group sizes
+    if (settings.getUpdateStrategy().isSetQueueStrategy()) {
+      totalInstancesFromGroups = settings.getUpdateStrategy().getQueueStrategy().getGroupSize();
+    } else if (settings.getUpdateStrategy().isSetBatchStrategy()) {
+      totalInstancesFromGroups = settings.getUpdateStrategy().getBatchStrategy().getGroupSize();
+    } else if (settings.getUpdateStrategy().isSetVarBatchStrategy()) {
+      VariableBatchJobUpdateStrategy strategy = settings.getUpdateStrategy().getVarBatchStrategy();
+
+      if (strategy.getGroupSizes().stream().anyMatch(x -> x <= 0)) {
+        return invalidRequest(INVALID_GROUP_SIZE);
+      }
+
+      totalInstancesFromGroups = strategy.getGroupSizes().stream().reduce(0, Integer::sum);
+    } else {
+      return invalidRequest(UNKNOWN_UPDATE_STRATEGY);
+    }
+
+    if (totalInstancesFromGroups <= 0) {
+      return invalidRequest(NO_INSTANCES_MODIFIED);
     }
 
     if (settings.getMaxPerInstanceFailures() < 0) {
@@ -1047,10 +1072,13 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   static final String NO_CRON = "Cron jobs may only be created/updated by calling scheduleCronJob.";
 
   @VisibleForTesting
+  static final String NO_INSTANCES_MODIFIED = "Update results in no instance being modified.";
+
+  @VisibleForTesting
   static final String NON_SERVICE_TASK = "Updates are not supported for non-service tasks.";
 
   @VisibleForTesting
-  static final String INVALID_GROUP_SIZE = "updateGroupSize must be positive.";
+  static final String INVALID_GROUP_SIZE = "All update group sizes must be positive.";
 
   @VisibleForTesting
   static final String INVALID_MAX_FAILED_INSTANCES = "maxFailedInstances must be non-negative.";
@@ -1075,6 +1103,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   @VisibleForTesting
   static final String INVALID_INSTANCE_COUNT = "Instance count must be positive.";
+
+  @VisibleForTesting
+  static final String UNKNOWN_UPDATE_STRATEGY = "Update strategy provided is unknown.";
 
   @VisibleForTesting
   static final String INVALID_SLA_AWARE_UPDATE = "slaAware is true, but no task slaPolicy is "

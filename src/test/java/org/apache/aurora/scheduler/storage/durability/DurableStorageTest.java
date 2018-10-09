@@ -40,9 +40,11 @@ import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.gen.JobUpdateStrategy;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.PercentageSlaPolicy;
+import org.apache.aurora.gen.QueueJobUpdateStrategy;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -256,11 +258,16 @@ public class DurableStorageTest extends EasyMockTest {
         .setInstructions(new JobUpdateInstructions()
             .setInitialState(
                 ImmutableSet.of(new InstanceTaskConfig().setTask(nonBackfilledConfig())))
-            .setDesiredState(new InstanceTaskConfig().setTask(nonBackfilledConfig())));
+            .setDesiredState(new InstanceTaskConfig().setTask(nonBackfilledConfig()))
+            .setSettings(new JobUpdateSettings()));
     JobUpdate expectedUpdate = actualUpdate.deepCopy();
     expectedUpdate.getInstructions().getDesiredState().setTask(makeConfig(JOB_KEY).newBuilder());
     expectedUpdate.getInstructions().getInitialState()
         .forEach(e -> e.setTask(makeConfig(JOB_KEY).newBuilder()));
+    expectedUpdate.getInstructions()
+        .getSettings()
+        .setUpdateStrategy(
+            JobUpdateStrategy.queueStrategy(new QueueJobUpdateStrategy().setGroupSize(0)));
     SaveJobUpdate saveUpdate = new SaveJobUpdate().setJobUpdate(actualUpdate);
     builder.add(Edit.op(Op.saveJobUpdate(saveUpdate)));
     storageUtil.jobUpdateStore.saveJobUpdate(IJobUpdate.build(expectedUpdate));

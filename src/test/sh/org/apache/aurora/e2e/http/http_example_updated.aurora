@@ -49,6 +49,7 @@ no_python_task = Task(
 
 update_config = UpdateConfig(watch_secs=0, batch_size=3)
 update_config_watch_secs = UpdateConfig(watch_secs=10, batch_size=3)
+update_config_var_batch = UpdateConfig(update_strategy = VariableBatchUpdateStrategy(batch_sizes = [1,2]))
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=2, min_consecutive_successes=15)
 shell_health_check_config = HealthCheckConfig(
   health_checker = HealthCheckerConfig(
@@ -77,6 +78,11 @@ jobs = [
   job(
     name = 'http_example_watch_secs',
     update_config = update_config_watch_secs
+  ).bind(profile=DefaultProfile()),
+  job(
+    name = 'http_example_var_batch_update',
+    update_config = update_config_var_batch,
+    task = test_task
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_revocable',

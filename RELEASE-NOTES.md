@@ -1,3 +1,27 @@
+0.22.0 (unreleased)
+======
+
+### New/updated:
+- New update strategy added: Variable Batch Update. With this strategy, a job may be updated in
+  in batches of different sizes. For example, an update which modifies a total of 10 instances may
+  be done in batch sizes of 2, 3, and 5. The number of updated instances must equal the size of the
+  current group size in order to move to the next group size. If the number of updated instances is
+  greater to the sum of all group sizes, the last group size will be used in perpetuity until all 
+  instances are updated.
+  A new field has been added to `UpdateConfig` called `update_strategy`.
+  Update strategy may take a `QueueUpdateStrategy`, `BatchUpdateStrategy`,
+  or a `VariableBatchUpdateStrategy` object. `QueueUpdateStrategy` and `BatchUpdateStrategy` take
+  a single integer argument while `VariableBatchUpdateStrategy` takes a list of positive integers
+  as an argument.
+  
+### Deprecations and removals:
+
+- Deprecated use of Thrift fields `JobUpdateSettings.waitForBatchCompletion` and
+  `JobUpdateSettings.updateGroupSize`. Please set the proper `JobUpdateSettings.updateStrategy`
+  instead. Note that these same constructs, as represented in the Aurora DSL, are still valid
+  as they will be converted to the new field automatically by the client
+  for backwards compatibility.
+  
 0.21.0
 ======
 

@@ -23,6 +23,7 @@ import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.util.testing.FakeBuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.BatchJobUpdateStrategy;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.HostMaintenanceRequest;
@@ -40,6 +41,7 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateState;
 import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.gen.JobUpdateStrategy;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.PercentageSlaPolicy;
@@ -143,12 +145,12 @@ public class SnapshotterImplIT {
                       .setTask(TASK_CONFIG.newBuilder())))
               .setSettings(new JobUpdateSettings()
                   .setBlockIfNoPulsesAfterMs(500)
-                  .setUpdateGroupSize(1)
+                  .setUpdateStrategy(
+                      JobUpdateStrategy.batchStrategy(new BatchJobUpdateStrategy().setGroupSize(1)))
                   .setMaxPerInstanceFailures(1)
                   .setMaxFailedInstances(1)
                   .setMinWaitInInstanceRunningMs(200)
                   .setRollbackOnFailure(true)
-                  .setWaitForBatchCompletion(true)
                   .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 0)))))
           .setSummary(new JobUpdateSummary()
               .setState(new JobUpdateState().setStatus(JobUpdateStatus.ERROR))

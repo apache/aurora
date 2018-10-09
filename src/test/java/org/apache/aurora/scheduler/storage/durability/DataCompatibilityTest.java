@@ -304,7 +304,7 @@ public class DataCompatibilityTest {
     Map<String, ValueDifference<String>> modified = difference.entriesDiffering();
     if (!modified.isEmpty()) {
       error.append("Schema changes to Op(s): " + modified.keySet())
-          .append("\nThis check detects that changes occured, not how the schema changed.")
+          .append("\nThis check detects that changes occurred, not how the schema changed.")
           .append("\nSome guidelines for evolving schemas:")
           .append("\n  * Introducing fields: you must handle reading records that do not")
           .append("\n    yet have the field set.  This can be done with a backfill routine during")

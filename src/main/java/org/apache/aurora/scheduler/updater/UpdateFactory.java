@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.updater.strategy.BatchStrategy;
 import org.apache.aurora.scheduler.updater.strategy.QueueStrategy;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
+import org.apache.aurora.scheduler.updater.strategy.VariableBatchStrategy;
 
 import static java.util.Objects.requireNonNull;
 
@@ -76,12 +77,29 @@ interface UpdateFactory {
     public Update newUpdate(IJobUpdateInstructions instructions, boolean rollingForward) {
       requireNonNull(instructions);
       IJobUpdateSettings settings = instructions.getSettings();
+
       checkArgument(
           settings.getMinWaitInInstanceRunningMs() >= 0,
           "Min wait in running must be non-negative.");
-      checkArgument(
-          settings.getUpdateGroupSize() > 0,
-          "Update group size must be positive.");
+
+      if (settings.getUpdateStrategy().isSetBatchStrategy()) {
+        checkArgument(
+            settings.getUpdateStrategy().getBatchStrategy().getGroupSize() > 0,
+            GROUP_SIZES_INVALID);
+      } else if (settings.getUpdateStrategy().isSetVarBatchStrategy()) {
+        checkArgument(
+            settings.getUpdateStrategy().
+                getVarBatchStrategy().
+                getGroupSizes().
+                stream().
+                reduce(0, Integer::sum) > 0,
+            GROUP_SIZES_INVALID);
+
+      } else {
+        checkArgument(
+            settings.getUpdateStrategy().getQueueStrategy().getGroupSize() > 0,
+            GROUP_SIZES_INVALID);
+      }
 
       Set<Integer> currentInstances = expandInstanceIds(instructions.getInitialState());
       Set<Integer> desiredInstances = instructions.isSetDesiredState()
@@ -116,9 +134,26 @@ interface UpdateFactory {
           ? updateOrdering
           : updateOrdering.reverse();
 
-      UpdateStrategy<Integer> strategy = settings.isWaitForBatchCompletion()
-          ? new BatchStrategy<>(updateOrder, settings.getUpdateGroupSize())
-          : new QueueStrategy<>(updateOrder, settings.getUpdateGroupSize());
+      UpdateStrategy<Integer> strategy;
+
+      // Note: Verification that the update strategy exists and is valid has already taken
+      // place when the scheduler receives the thrift call.
+      // TODO(rdelvalle): Consider combining Batch Update and Variable Batch update strategies.
+      if (settings.getUpdateStrategy().isSetBatchStrategy()) {
+        strategy = new BatchStrategy<>(
+            updateOrder,
+            settings.getUpdateStrategy().getBatchStrategy().getGroupSize());
+      } else if (settings.getUpdateStrategy().isSetVarBatchStrategy()) {
+        strategy = new VariableBatchStrategy<>(
+            updateOrder,
+            settings.getUpdateStrategy().getVarBatchStrategy().getGroupSizes(),
+            rollingForward);
+      } else {
+        strategy = new QueueStrategy<>(
+            updateOrder,
+            settings.getUpdateStrategy().getQueueStrategy().getGroupSize());
+      }
+
       JobUpdateStatus successStatus =
           rollingForward ? JobUpdateStatus.ROLLED_FORWARD : JobUpdateStatus.ROLLED_BACK;
       JobUpdateStatus failureStatus = rollingForward && settings.isRollbackOnFailure()
@@ -138,6 +173,8 @@ interface UpdateFactory {
     static Set<Integer> expandInstanceIds(Set<IInstanceTaskConfig> instanceGroups) {
       return Updates.getInstanceIds(instanceGroups).asSet(DiscreteDomain.integers());
     }
+
+    static final String GROUP_SIZES_INVALID = "Update group size(s) must be positive.";
   }
 
   /**

@@ -32,6 +32,8 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateRequest,
     JobUpdateSettings,
     JobUpdateStatus,
+    JobUpdateStrategy,
+    QueueJobUpdateStrategy,
     Resource,
     Response,
     ResponseCode,
@@ -83,11 +85,16 @@ class TestJobUpdateApis(unittest.TestCase):
   def create_update_settings(cls):
     return JobUpdateSettings(
         updateGroupSize=1,
+        updateStrategy=JobUpdateStrategy(
+          queueStrategy=QueueJobUpdateStrategy(groupSize=1),
+          batchStrategy=None,
+          varBatchStrategy=None),
         maxPerInstanceFailures=2,
         maxFailedInstances=1,
         minWaitInInstanceRunningMs=50 * 1000,
         rollbackOnFailure=True,
-        waitForBatchCompletion=False)
+        waitForBatchCompletion=False,
+        slaAware=False)
 
   @classmethod
   def create_update_request(cls, task_config):
@@ -99,12 +106,14 @@ class TestJobUpdateApis(unittest.TestCase):
   @classmethod
   def mock_job_config(cls, error=None):
     config = create_autospec(spec=AuroraConfig, instance=True)
-    mock_get = create_autospec(spec=UpdateConfig, instance=True)
-    mock_get.get.return_value = cls.UPDATE_CONFIG
+    update_config = UpdateConfig(batch_size=1,
+                                 watch_secs=50,
+                                 max_per_shard_failures=2,
+                                 max_total_failures=1)
     if error:
       config.update_config.side_effect = error
     else:
-      config.update_config.return_value = mock_get
+      config.update_config.return_value = update_config
     mock_task_config = create_autospec(spec=JobConfiguration, instance=True)
     mock_task_config.taskConfig = TaskConfig()
     config.job.return_value = mock_task_config

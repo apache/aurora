@@ -22,6 +22,8 @@ import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;
+import org.apache.aurora.gen.JobUpdateStrategy;
+import org.apache.aurora.gen.QueueJobUpdateStrategy;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
@@ -46,7 +48,8 @@ public class UpdateFactoryImplTest {
               .setMaxFailedInstances(1)
               .setMaxPerInstanceFailures(1)
               .setMinWaitInInstanceRunningMs(100)
-              .setUpdateGroupSize(2)
+              .setUpdateStrategy(
+                  JobUpdateStrategy.queueStrategy(new QueueJobUpdateStrategy().setGroupSize(2)))
               .setUpdateOnlyTheseInstances(ImmutableSet.of())));
 
   private UpdateFactory factory;

@@ -25,6 +25,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 
+import org.apache.aurora.gen.BatchJobUpdateStrategy;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdate;
@@ -37,6 +38,7 @@ import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateState;
 import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.gen.JobUpdateStrategy;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
@@ -629,7 +631,9 @@ public abstract class AbstractJobUpdateStoreTest {
                 .setTask(config)))
         .setSettings(new JobUpdateSettings()
             .setBlockIfNoPulsesAfterMs(500)
-            .setUpdateGroupSize(1)
+            .setUpdateStrategy(
+                JobUpdateStrategy.batchStrategy(new BatchJobUpdateStrategy().setGroupSize(1)))
+            .setUpdateGroupSize(1) // TODO(rdelvalle): Remove when thrift field deprecated.
             .setMaxPerInstanceFailures(1)
             .setMaxFailedInstances(1)
             .setMinWaitInInstanceRunningMs(200)

@@ -20,9 +20,13 @@ import java.util.stream.Collectors;
 import com.google.inject.Inject;
 
 import org.apache.aurora.GuavaUtils;
+import org.apache.aurora.gen.BatchJobUpdateStrategy;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.JobUpdateSettings;
+import org.apache.aurora.gen.JobUpdateStrategy;
+import org.apache.aurora.gen.QueueJobUpdateStrategy;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -32,6 +36,7 @@ import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -143,8 +148,27 @@ public final class ThriftBackfill {
       backfillTask(instructions.getDesiredState().getTask());
     }
 
+    backfillUpdateStrategy(instructions.getSettings());
+
     instructions.getInitialState().forEach(e -> backfillTask(e.getTask()));
 
     return IJobUpdate.build(update);
+  }
+
+  public static void backfillUpdateStrategy(JobUpdateSettings settings) {
+    IJobUpdateSettings updateSettings = IJobUpdateSettings.build(settings);
+
+    // Convert old job update schema to have an update strategy
+    if (!updateSettings.isSetUpdateStrategy()) {
+      if (updateSettings.isWaitForBatchCompletion()) {
+        settings.setUpdateStrategy(
+            JobUpdateStrategy.batchStrategy(
+                new BatchJobUpdateStrategy().setGroupSize(updateSettings.getUpdateGroupSize())));
+      } else {
+        settings.setUpdateStrategy(
+            JobUpdateStrategy.queueStrategy(
+                new QueueJobUpdateStrategy().setGroupSize(updateSettings.getUpdateGroupSize())));
+      }
+    }
   }
 }

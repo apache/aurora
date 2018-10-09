@@ -364,7 +364,6 @@ test_update() {
   # Check that the update ended in ROLLED_FORWARD state.  Assumes the status is the last column.
   assert_update_state_by_id $_jobkey $_update_id 'ROLLED_FORWARD'
 }
-
 test_update_fail() {
   local _jobkey=$1 _config=$2 _cluster=$3  _bad_healthcheck_config=$4
   shift 4
@@ -882,6 +881,7 @@ TEST_ENV=test
 TEST_JOB=http_example
 TEST_MAINTENANCE_JOB=http_example_maintenance
 TEST_JOB_WATCH_SECS=http_example_watch_secs
+TEST_JOB_VAR_BATCH_UPDATE=http_example_var_batch_update
 TEST_JOB_REVOCABLE=http_example_revocable
 TEST_JOB_GPU=http_example_gpu
 TEST_JOB_DOCKER=http_example_docker
@@ -917,6 +917,8 @@ TEST_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB")
 TEST_MAINTENANCE_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_MAINTENANCE_JOB")
 
 TEST_JOB_WATCH_SECS_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_WATCH_SECS")
+
+TEST_JOB_VAR_BATCH_UPDATE_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_VAR_BATCH_UPDATE")
 
 TEST_JOB_REVOCABLE_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_REVOCABLE")
 
@@ -959,6 +961,7 @@ TEST_SLA_AWARE_MAINTENANCE_ARGS=(
   $TEST_JOB_COORDINATOR_SLA
 )
 
+
 TEST_JOB_KILL_MESSAGE_ARGS=("${TEST_JOB_ARGS[@]}" "--message='Test message'")
 
 trap collect_result EXIT
@@ -974,6 +977,8 @@ test_partition_awareness "${TEST_PARTITION_AWARENESS_ARGS[@]}"
 test_version
 test_http_example "${TEST_JOB_ARGS[@]}"
 test_http_example "${TEST_JOB_WATCH_SECS_ARGS[@]}"
+# TODO(rdelvalle): Add verification that each batch has the right number of active instances.
+test_http_example "${TEST_JOB_VAR_BATCH_UPDATE_ARGS[@]}"
 test_health_check
 
 test_mesos_maintenance "${TEST_MAINTENANCE_JOB_ARGS[@]}"
@@ -985,6 +990,7 @@ test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}"
 test_http_example_basic "${TEST_JOB_KILL_MESSAGE_ARGS[@]}"
 
 test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
+
 
 setup_image_stores
 test_appc_unified

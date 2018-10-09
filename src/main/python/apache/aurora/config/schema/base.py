@@ -28,6 +28,14 @@ class MesosContext(Struct):
   instance    = Required(Integer)
   hostname    = Required(String)
 
+class QueueUpdateStrategy(Struct):
+  batch_size = Default(Integer, 1)
+
+class BatchUpdateStrategy(Struct):
+  batch_size = Default(Integer, 1)
+
+class VariableBatchUpdateStrategy(Struct):
+  batch_sizes = Required(List(Integer))
 
 class UpdateConfig(Struct):
   batch_size                  = Default(Integer, 1)
@@ -38,6 +46,9 @@ class UpdateConfig(Struct):
   wait_for_batch_completion   = Default(Boolean, False)
   pulse_interval_secs         = Integer
   sla_aware                   = Default(Boolean, False)
+  update_strategy             = Choice([QueueUpdateStrategy,
+                                        BatchUpdateStrategy,
+                                        VariableBatchUpdateStrategy])
 
 
 class HttpHealthChecker(Struct):

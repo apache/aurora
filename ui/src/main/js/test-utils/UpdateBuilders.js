@@ -18,6 +18,16 @@ export default {
   USER
 };
 
+export const VarBatchUpdateStrategyBuilder = createBuilder({
+  groupSizes: [1, 2, 3]
+});
+
+export const UpdateStrategyBuilder = createBuilder({
+  batchStrategy: null,
+  queueStrategy: null,
+  varBatchStrategy: VarBatchUpdateStrategyBuilder.build()
+});
+
 export const UpdateSettingsBuilder = createBuilder({
   updateGroupSize: 1,
   maxPerInstanceFailures: 0,
@@ -25,7 +35,8 @@ export const UpdateSettingsBuilder = createBuilder({
   minWaitInInstanceRunningMs: 1,
   rollbackOnFailure: true,
   updateOnlyTheseInstances: [],
-  waitForBatchCompletion: false
+  waitForBatchCompletion: false,
+  updateStrategy: UpdateStrategyBuilder.build()
 });
 
 export const UpdateEventBuilder = createBuilder({
