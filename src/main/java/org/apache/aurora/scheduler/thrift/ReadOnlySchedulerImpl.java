@@ -171,7 +171,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     List<ScheduledTask> tasks = Lists.transform(
         getTasks(query),
         task -> {
-          task.getAssignedTask().getTask().unsetExecutorConfig();
+          task.getAssignedTask().getTask().getExecutorConfig().unsetData();
           return task;
         });
 

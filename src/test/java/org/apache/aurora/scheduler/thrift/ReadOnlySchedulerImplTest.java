@@ -353,9 +353,12 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
+    TaskConfig taskConfig = defaultTask(true);
+    taskConfig.getExecutorConfig().unsetData();
+
     ImmutableList<ScheduledTask> expected = IScheduledTask.toBuildersList(makeDefaultScheduledTasks(
         10,
-        defaultTask(true).setExecutorConfig(null)));
+        taskConfig));
 
     Response response = assertOkResponse(thrift.getTasksWithoutConfigs(new TaskQuery()));
     assertEquals(expected, response.getResult().getScheduleStatusResult().getTasks());
