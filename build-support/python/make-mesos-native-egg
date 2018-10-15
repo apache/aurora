@@ -139,15 +139,18 @@ CENTOS6_X86_64_DEPENDENCIES=(
   apr-devel
   cyrus-sasl-devel
   cyrus-sasl-md5
-  devtoolset-2-binutils
-  devtoolset-2-gcc
-  devtoolset-2-gcc-c++
+  devtoolset-7-binutils
+  devtoolset-7-gcc
+  devtoolset-7-gcc-c++
+  devtoolset-7-toolchain
   libcurl-devel
   make
   patch
   python27-python-devel
   subversion-devel
   zlib-devel
+  wget
+  tar
 )
 build_centos6() {
   local mesos_version=$1 output_basedir=$2
@@ -160,17 +163,11 @@ build_centos6() {
 
     # We need Software Collections for Python 2.7 (we dropped support for 2.6).
     # wget must get installed before everything else to fetch the additional repos.
-    yum -y install centos-release-SCL wget
-
-    # Mesos requires gcc 4.8, which is available in devtools-2 on centos 6.
-    # TODO(maxim): Consider using signed packages when/if available.
-    wget http://people.centos.org/tru/devtools-2/devtools-2.repo -O /etc/yum.repos.d/devtools-2.repo
-
+    yum -y install centos-release-scl-rh
     yum -y install ${CENTOS6_X86_64_DEPENDENCIES[*]}
-    export CC=/opt/rh/devtoolset-2/root/usr/bin/gcc
-    export CPP=/opt/rh/devtoolset-2/root/usr/bin/cpp
-    export CXX=/opt/rh/devtoolset-2/root/usr/bin/c++
-    scl enable devtoolset-2 bash
+
+    # Mesos requires gcc 4.8+, which is available in devtools-7 on centos 6.
+    scl enable devtoolset-7 bash
     scl enable python27 - <<EOS
         $(fetch_and_build_mesos "$mesos_version")
 EOS
@@ -192,6 +189,7 @@ CENTOS7_X86_64_DEPENDENCIES=(
   subversion-devel
   wget
   zlib-devel
+  tar
 )
 build_centos7() {
   local mesos_version=$1 output_basedir=$2
