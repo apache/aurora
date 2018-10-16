@@ -155,6 +155,20 @@ def test_simple_config():
     assert proxy_config1.ports() == set()
 
 
+def test_schema_equality():
+  one = REIFIED_CONFIG
+  two = REIFIED_CONFIG
+  other = REIFIED_LIMITED_CONFIG
+
+  assert one() == two()
+  assert not one() == other()
+  assert one() != other()
+  assert not one() != two()
+
+  assert one() in {two(): 'foo'}
+  assert one() not in {other(): 'bar'}
+
+
 def make_config(announce, *ports):
   process = Process(
       name='hello',
