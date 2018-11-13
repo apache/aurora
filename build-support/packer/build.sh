@@ -17,7 +17,7 @@ set -o errexit
 set -o nounset
 set -o verbose
 
-readonly MESOS_VERSION=1.5.0
+readonly MESOS_VERSION=1.6.1
 
 function remove_unused {
   # The default bento/ubuntu-16.04 image includes juju-core, which adds ~300 MB to our image.
@@ -62,14 +62,14 @@ function install_docker {
 }
 
 function install_docker2aci {
-  DOCKER2ACI_VERSION="0.17.1"
-  GOLANG_VERSION="1.9.2"
+  DOCKER2ACI_VERSION="0.17.2"
+  GOLANG_VERSION="1.11"
 
   TEMP_PATH=$(mktemp -d)
   pushd "$TEMP_PATH"
 
   echo "Downloading go..."
-  curl -sL "https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-amd64.tar.gz" | tar -xz
+  curl -sL "https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz" | tar -xz
 
   export GOROOT="$PWD/go"
   export PATH="$PATH:$GOROOT/bin"

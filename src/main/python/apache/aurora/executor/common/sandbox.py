@@ -182,6 +182,12 @@ class DockerDirectorySandbox(DirectorySandbox):
     try:
       safe_mkdir(mesos_host_sandbox_root)
       os.symlink(os.environ['MESOS_SANDBOX'], self._mesos_dir)
+      # Restore permissions to pre Mesos 1.6.0 levels in order to retain Aurora task ssh
+      # functionality. This directory is bind mounted by Mesos therefore it'll
+      # change the permissions on the host.
+      # This is necessary since Mesos 1.6.0 (https://issues.apache.org/jira/browse/MESOS-8332).
+      # TODO(rdelvalle): Find a cleaner solution for this problem.
+      os.chmod(os.environ['MESOS_SANDBOX'], 0755)
     except (IOError, OSError) as e:
       raise self.CreationError('Failed to create the sandbox root: %s' % e)
 

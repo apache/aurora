@@ -390,7 +390,7 @@ dependencies {
   compile "org.apache.curator:curator-client:${curatorRev}"
   compile "org.apache.curator:curator-framework:${curatorRev}"
   compile "org.apache.curator:curator-recipes:${curatorRev}"
-  compile 'org.apache.mesos:mesos:1.5.0'
+  compile 'org.apache.mesos:mesos:1.6.1'
   compile "org.asynchttpclient:async-http-client:${asyncHttpclientRev}"
   compile "org.apache.shiro:shiro-guice:${shiroRev}"
   compile "org.apache.shiro:shiro-web:${shiroRev}"
