@@ -343,8 +343,15 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Tier contains illegal characters: " + config.getTier());
     }
 
+    if (!config.isSetTier()) {
+      String defaultTierName = tierManager.getDefaultTierName();
+      builder.setTier(defaultTierName);
+      builder.setProduction(tierManager.getTiers().get(defaultTierName).isProduction());
+    }
+
     try {
-      tierManager.getTier(config);
+      // Explicitly set the production field as it is used for Quota calculations.
+      builder.setProduction(tierManager.getTier(config).isProduction());
     } catch (IllegalArgumentException e) {
       throw new TaskDescriptionException(e.getMessage(), e);
     }

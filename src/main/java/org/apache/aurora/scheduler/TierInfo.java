@@ -20,6 +20,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 
 import org.codehaus.jackson.annotate.JsonCreator;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 
 /**
@@ -56,6 +57,17 @@ public final class TierInfo {
    */
   public boolean isRevocable() {
     return revocable;
+  }
+
+  /**
+   * Checks if this tier meets the requirements to be considered a production tier:
+   * Tier must not be running on revocable resources and must not be preemptable.
+   *
+   * @return {@code true} if this tier is a production tier, {@code false} otherwise.
+   */
+  @JsonIgnore
+  public boolean isProduction() {
+    return !(revocable || preemptible);
   }
 
   /**

@@ -81,7 +81,7 @@ public final class TaskTestUtil {
           REVOCABLE_TIER_NAME, REVOCABLE_TIER
       ));
   public static final TierManager TIER_MANAGER = new TierManager.TierManagerImpl(TIER_CONFIG);
-  public static final ThriftBackfill THRIFT_BACKFILL = new ThriftBackfill(TIER_MANAGER);
+  public static final ThriftBackfill THRIFT_BACKFILL = new ThriftBackfill();
   public static final ConfigurationManagerSettings CONFIGURATION_MANAGER_SETTINGS =
       new ConfigurationManagerSettings(
           ImmutableSet.of(_Fields.MESOS),
