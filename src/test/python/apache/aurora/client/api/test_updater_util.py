@@ -11,28 +11,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import unittest
 import copy
+import unittest
 
-from pytest import raises
 from pystachio import Choice
+from pytest import raises
+
+from apache.aurora.client.api import UpdaterConfig
+from apache.aurora.config.schema.base import (
+    BatchUpdateStrategy as PystachioBatchUpdateStrategy,
+    QueueUpdateStrategy as PystachioQueueUpdateStrategy,
+    UpdateConfig,
+    VariableBatchUpdateStrategy as PystachioVariableBatchUpdateStrategy
+)
 
 from gen.apache.aurora.api.ttypes import (
-  JobUpdateSettings,
-  JobUpdateStrategy,
-  VariableBatchJobUpdateStrategy,
-  BatchJobUpdateStrategy,
-  QueueJobUpdateStrategy
+    BatchJobUpdateStrategy,
+    JobUpdateSettings,
+    JobUpdateStrategy,
+    QueueJobUpdateStrategy,
+    Range,
+    VariableBatchJobUpdateStrategy
 )
-from apache.aurora.client.api import UpdaterConfig
-from apache.aurora.config.schema.base import UpdateConfig
-from apache.aurora.config.schema.base import (
-  BatchUpdateStrategy as PystachioBatchUpdateStrategy,
-  QueueUpdateStrategy as PystachioQueueUpdateStrategy,
-  VariableBatchUpdateStrategy as PystachioVariableBatchUpdateStrategy
-)
-
-from gen.apache.aurora.api.ttypes import Range
 
 
 class TestUpdaterUtil(unittest.TestCase):

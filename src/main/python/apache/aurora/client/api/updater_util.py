@@ -16,16 +16,17 @@ import collections
 from itertools import groupby
 from operator import itemgetter
 
-from pystachio import Empty, Choice
+from pystachio import Choice, Empty
 from twitter.common import log
 
-from gen.apache.aurora.api.ttypes import JobUpdateSettings, Range
 from apache.aurora.config.schema.base import (
- BatchUpdateStrategy as PystachioBatchUpdateStrategy,
- QueueUpdateStrategy as PystachioQueueUpdateStrategy,
- VariableBatchUpdateStrategy as PystachioVariableBatchUpdateStrategy
+    BatchUpdateStrategy as PystachioBatchUpdateStrategy,
+    QueueUpdateStrategy as PystachioQueueUpdateStrategy,
+    VariableBatchUpdateStrategy as PystachioVariableBatchUpdateStrategy
 )
 from apache.aurora.config.thrift import create_update_strategy_config
+
+from gen.apache.aurora.api.ttypes import JobUpdateSettings, Range
 
 
 class UpdaterConfig(object):

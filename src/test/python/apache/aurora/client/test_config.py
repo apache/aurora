@@ -20,8 +20,10 @@ import pytest
 from twitter.common.contextutil import temporary_dir
 
 from apache.aurora.client import config
-from apache.aurora.client.config import get_config as get_aurora_config
-from apache.aurora.client.config import PRODUCTION_DEPRECATED_WARNING
+from apache.aurora.client.config import (
+    PRODUCTION_DEPRECATED_WARNING,
+    get_config as get_aurora_config
+)
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 from apache.aurora.config.schema.base import (

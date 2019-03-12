@@ -17,8 +17,7 @@
 from operator import attrgetter
 from time import time
 
-from psutil import Error as PsutilError
-from psutil import AccessDenied, NoSuchProcess, Process
+from psutil import AccessDenied, Error as PsutilError, NoSuchProcess, Process
 from twitter.common import log
 
 from .process import ProcessSample

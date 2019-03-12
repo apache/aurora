@@ -18,8 +18,7 @@ import threading
 import pytest
 from kazoo.client import KazooClient
 from kazoo.exceptions import KazooException
-from kazoo.security import Permissions as KazooPermissions
-from kazoo.security import ACL, Id
+from kazoo.security import ACL, Id, Permissions as KazooPermissions
 from mock import MagicMock, call, create_autospec, patch
 from twitter.common.contextutil import temporary_file
 from twitter.common.quantity import Amount, Time

@@ -15,8 +15,7 @@
 from twitter.common import app
 from twitter.common.log.options import LogOptions
 
-from apache.aurora.admin import help as help_commands
-from apache.aurora.admin import admin, maintenance
+from apache.aurora.admin import admin, help as help_commands, maintenance
 from apache.aurora.common.auth.auth_module_manager import register_auth_module
 
 from .help import add_verbosity_options, generate_terse_usage

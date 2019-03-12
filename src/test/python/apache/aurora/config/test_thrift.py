@@ -19,13 +19,11 @@ import re
 import pytest
 
 from apache.aurora.config import AuroraConfig
-from apache.aurora.config.schema.base import CoordinatorSlaPolicy as PystachioCoordinatorSlaPolicy
-from apache.aurora.config.schema.base import CountSlaPolicy as PystachioCountSlaPolicy
-from apache.aurora.config.schema.base import PartitionPolicy as PystachioPartitionPolicy
-from apache.aurora.config.schema.base import PercentageSlaPolicy as PystachioPercentageSlaPolicy
 from apache.aurora.config.schema.base import (
     AppcImage,
     Container,
+    CoordinatorSlaPolicy as PystachioCoordinatorSlaPolicy,
+    CountSlaPolicy as PystachioCountSlaPolicy,
     Docker,
     DockerImage,
     ExecutorConfig,
@@ -35,21 +33,26 @@ from apache.aurora.config.schema.base import (
     Metadata,
     Mode,
     Parameter,
+    PartitionPolicy as PystachioPartitionPolicy,
+    PercentageSlaPolicy as PystachioPercentageSlaPolicy,
     SimpleTask,
     Volume
 )
-from apache.aurora.config.thrift import convert as convert_pystachio_to_thrift
-from apache.aurora.config.thrift import InvalidConfig, task_instance_from_job
+from apache.aurora.config.thrift import (
+    InvalidConfig,
+    convert as convert_pystachio_to_thrift,
+    task_instance_from_job
+)
 from apache.thermos.config.schema import Process, Resources, Task
 
 from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME, GOOD_IDENTIFIER_PATTERN_PYTHON
-from gen.apache.aurora.api.ttypes import Mode as ThriftMode
 from gen.apache.aurora.api.ttypes import (
     CoordinatorSlaPolicy,
     CountSlaPolicy,
     CronCollisionPolicy,
     Identity,
     JobKey,
+    Mode as ThriftMode,
     PartitionPolicy,
     PercentageSlaPolicy,
     Resource

@@ -16,8 +16,7 @@ import hashlib
 import json
 import pkgutil
 
-from pystachio.config import Config as PystachioConfig
-from pystachio.config import FileExecutor, FilelikeExecutor
+from pystachio.config import Config as PystachioConfig, FileExecutor, FilelikeExecutor
 
 from apache.aurora.config.schema import base as base_schema
 

@@ -13,17 +13,16 @@
 #
 import hashlib
 import json
-import mock
 import os
 import tempfile
 from io import BytesIO
 
+import mock
 import pytest
-from twitter.common.contextutil import temporary_file, temporary_dir
+from twitter.common.contextutil import temporary_dir, temporary_file
 
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
-
 
 BAD_MESOS_CONFIG = """
 3 2 1 3 2 4 2 3

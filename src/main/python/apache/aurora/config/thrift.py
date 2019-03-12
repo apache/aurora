@@ -18,23 +18,21 @@ import re
 from pystachio import Empty, Ref
 from twitter.common.lang import Compatibility
 
-from apache.aurora.config.schema.base import(
-  AppcImage as PystachioAppcImage,
-  BatchUpdateStrategy as PystachioBatchUpdateStrategy,
-  Container as PystachioContainer,
-  CoordinatorSlaPolicy as PystachioCoordinatorSlaPolicy,
-  CountSlaPolicy as PystachioCountSlaPolicy,
-  DockerImage as PystachioDockerImage,
-  PercentageSlaPolicy as PystachioPercentageSlaPolicy,
-  QueueUpdateStrategy as PystachioQueueUpdateStrategy,
-  VariableBatchUpdateStrategy as PystachioVariableBatchUpdateStrategy
-)
 from apache.aurora.config.schema.base import (
+    AppcImage as PystachioAppcImage,
+    BatchUpdateStrategy as PystachioBatchUpdateStrategy,
+    Container as PystachioContainer,
+    CoordinatorSlaPolicy as PystachioCoordinatorSlaPolicy,
+    CountSlaPolicy as PystachioCountSlaPolicy,
     Docker,
+    DockerImage as PystachioDockerImage,
     HealthCheckConfig,
     Mesos,
     MesosContext,
-    MesosTaskInstance
+    MesosTaskInstance,
+    PercentageSlaPolicy as PystachioPercentageSlaPolicy,
+    QueueUpdateStrategy as PystachioQueueUpdateStrategy,
+    VariableBatchUpdateStrategy as PystachioVariableBatchUpdateStrategy
 )
 from apache.thermos.config.loader import ThermosTaskValidator
 
@@ -62,13 +60,13 @@ from gen.apache.aurora.api.ttypes import (
     Mode,
     PartitionPolicy,
     PercentageSlaPolicy,
-    Resource,
     QueueJobUpdateStrategy,
+    Resource,
     SlaPolicy,
     TaskConfig,
     TaskConstraint,
-    VariableBatchJobUpdateStrategy,
     ValueConstraint,
+    VariableBatchJobUpdateStrategy,
     Volume
 )
 
