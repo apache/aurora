@@ -20,7 +20,6 @@ from apache.aurora.client import binding_helper
 from apache.aurora.client.binding_helper import BindingHelper, CachingBindingHelper
 from apache.aurora.config import AuroraConfig
 
-
 GENERIC_CONFIG = """
 main_job = Job(
   name = 'hello_world',

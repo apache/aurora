@@ -103,8 +103,7 @@ if [[ -z "${thrift}" ]]; then
   # Without reverse engineering pants custom os-specific path names,
   # find a suitable thrift compiler
   readonly pants_cache_dir="$(get_pants_option GLOBAL pants_bootstrapdir)"
-  readonly thrift_bin_dir="$(get_pants_option thrift-binary supportdir)"
-  for candidate in "${pants_cache_dir}/${thrift_bin_dir}"/*/*/"${expected_version}"/thrift; do
+  for candidate in "${pants_cache_dir}"/bin/thrift/*/*/"${expected_version}"/thrift; do
     if compatible_thrift "${candidate}"; then
       thrift="${candidate}"
       break

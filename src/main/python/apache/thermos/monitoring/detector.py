@@ -100,8 +100,8 @@ class TaskDetector(object):
     ).getpath('task_path')
     path_regex = self._pathspec.given(
         root=re.escape(self._root_dir),
-        task_id="(\S+)",
-        state='(\S+)'
+        task_id=r'(\S+)',
+        state=r'(\S+)'
     ).getpath('task_path')
     return path_glob, re.compile(path_regex)
 
@@ -128,8 +128,8 @@ class TaskDetector(object):
         root=re.escape(self._root_dir),
         task_id=re.escape(task_id),
         log_dir=log_dir,
-        process='(\S+)',
-        run='(\d+)'
+        process=r'(\S+)',
+        run=r'(\d+)'
     ).getpath('process_logdir')
     return path_glob, re.compile(path_regex)
 
@@ -167,7 +167,7 @@ class TaskDetector(object):
     path_regex = self._pathspec.given(
         root=re.escape(self._root_dir),
         task_id=re.escape(task_id),
-        process='(\S+)',
+        process=r'(\S+)',
     ).getpath('process_checkpoint')
     return path_glob, re.compile(path_regex)
 

@@ -45,7 +45,6 @@ from .fixtures import HELLO_WORLD, MESOS_JOB
 
 from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, JobKey, TaskConfig
 
-
 FAKE_MESOS_CONTAINERIZER_BINARY = '''#!/bin/sh
 if [[ $# == 1 ]]; then
   echo "command_info" >&2

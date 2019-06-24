@@ -21,7 +21,6 @@ from twitter.common.contextutil import temporary_dir
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
-
 CLUSTERS = '''[
   {
     "name": "cluster1",

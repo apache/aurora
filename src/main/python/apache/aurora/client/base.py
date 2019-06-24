@@ -175,6 +175,7 @@ def get_update_page(api, jobkey, update_id):
   return synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
                         jobkey.env, jobkey.name, update_id)
 
+
 AURORA_V2_USER_AGENT_NAME = 'Aurora V2'
 AURORA_ADMIN_USER_AGENT_NAME = 'Aurora Admin'
 

@@ -44,7 +44,7 @@ def index_by_group(import_statements):
 
 
 IMPORT_CLASS_RE = re.compile(
-    'import(?: static)? (?P<outer>[^A-Z]*[A-Z]\w+)(?:\.(?P<inners>[\w][^;]*))?')
+    r'import(?: static)? (?P<outer>[^A-Z]*[A-Z]\w+)(?:\.(?P<inners>[\w][^;]*))?')
 
 
 def get_all_group_lines(import_groups):
@@ -79,6 +79,7 @@ def get_all_group_lines(import_groups):
   for group in remaining_groups:
     all_lines += get_group_lines(group)
   return all_lines
+
 
 BEFORE_IMPORTS = 'before_imports'
 IMPORTS = 'imports'

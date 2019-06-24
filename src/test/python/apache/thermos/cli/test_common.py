@@ -20,7 +20,6 @@ from twitter.common.contextutil import temporary_dir
 
 from apache.thermos.cli.common import get_task_from_options
 
-
 TASK_CONFIG = """
 proc = Process(name = 'process', cmdline = 'echo hello world')
 task = Task(name = 'task', processes = [proc])

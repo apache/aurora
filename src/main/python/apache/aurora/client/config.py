@@ -28,7 +28,6 @@ from apache.aurora.client import binding_helper
 from apache.aurora.client.base import die
 from apache.aurora.config import AuroraConfig
 
-
 ANNOUNCE_WARNING = """
 Announcer specified primary port as '%(primary_port)s' but no processes have bound that port.
 If you would like to utilize this port, you should listen on {{thermos.ports[%(primary_port)s]}}

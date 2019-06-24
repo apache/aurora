@@ -83,6 +83,7 @@ def arg_type_jobkey(key):
     parts.append('*')
   return PartialJobKey(*parts)
 
+
 WILDCARD_JOBKEY_OPTION = CommandOption("jobspec", type=arg_type_jobkey,
         metavar="cluster[/role[/env[/name]]]",
         help="A jobkey, optionally containing wildcards")

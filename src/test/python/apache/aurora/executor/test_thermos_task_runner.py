@@ -316,7 +316,7 @@ class TestThermosTaskRunnerIntegration(object):
       assert signaler.mock_calls == [
         call('/quitquitquit', use_post_method=True),
         call('/abortabortabort', use_post_method=True)]
-      assert task_runner.kill_called() == True
+      assert task_runner.kill_called() is True
 
   def test_thermos_normal_exit_status(self):
     with self.exit_with_status(0, TaskState.SUCCESS) as task_runner:

@@ -38,7 +38,7 @@ class TaskPath(object):
       path_glob = pathspec.given(task_id = "*").getpath(task_type)
       matching_paths = glob.glob(path_glob)
 
-      path_re = pathspec.given(task_id = "(\S+)").getpath(task_type)
+      path_re = pathspec.given(task_id = "(\\S+)").getpath(task_type)
       path_re = re.compile(path_re)
 
       ids = []

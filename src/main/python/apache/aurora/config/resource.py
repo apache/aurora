@@ -12,9 +12,8 @@
 # limitations under the License.
 #
 from collections import namedtuple
-from numbers import Number
-
 from enum import Enum, unique
+from numbers import Number
 
 from gen.apache.aurora.api.ttypes import Resource
 

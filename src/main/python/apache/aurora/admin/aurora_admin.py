@@ -27,6 +27,7 @@ add_verbosity_options()
 def main():
   app.help()
 
+
 try:
   from apache.aurora.kerberos.auth_module import KerberosAuthModule
   register_auth_module(KerberosAuthModule())

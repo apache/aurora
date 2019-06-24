@@ -32,7 +32,7 @@ PYTHON=${PYTHON:-$(which python2.7)}
 PANTS_HOME="${PANTS_HOME:-${HOME}/.cache/pants/setup}"
 PANTS_BOOTSTRAP="${PANTS_HOME}/bootstrap-$(uname -s)-$(uname -m)"
 
-VENV_VERSION=16.0.0
+VENV_VERSION=16.6.1
 
 VENV_PACKAGE=virtualenv-${VENV_VERSION}
 VENV_TARBALL=${VENV_PACKAGE}.tar.gz
