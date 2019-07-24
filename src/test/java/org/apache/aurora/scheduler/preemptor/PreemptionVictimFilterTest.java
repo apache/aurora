@@ -518,9 +518,53 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     ResourceBag one = bag(1, 1, 1);
     ResourceBag two = bag(2, 2, 2);
     ResourceBag three = bag(3, 3, 3);
+    ResourceBag twothree = bag(2, 2, 3);
     assertEquals(
-        ImmutableList.of(one, two, three, three),
-        ORDER.sortedCopy(ImmutableList.of(three, one, two, three)));
+        ImmutableList.of(one, two, twothree, three, three),
+        ORDER.sortedCopy(ImmutableList.of(three, twothree, one, two, three)));
+  }
+
+  @Test
+  public void testAmbiguousOrder() {
+    control.replay();
+
+    // None of the resource bags is clearly larger in all dimensions than the others.
+    // Our order operator needs to perform some tie breaking to make the whole
+    // ordering deterministic.
+    ResourceBag a = bag(ImmutableMap.of(
+        CPUS, 2.0,
+        RAM_MB, 0.0,
+        DISK_MB, 2.0
+    ));
+
+    ResourceBag b = bag(ImmutableMap.of(
+        CPUS, 1.0,
+        RAM_MB, 2.0,
+        DISK_MB, 1.0
+    ));
+
+    ResourceBag c = bag(ImmutableMap.of(
+        CPUS, 2.0,
+        RAM_MB, 2.0,
+        DISK_MB, 1.0
+    ));
+
+    // a = a, b = b, c = c
+    assertEquals(0, ORDER.compare(a, a));
+    assertEquals(0, ORDER.compare(b, b));
+    assertEquals(0, ORDER.compare(c, c));
+
+    // a > b
+    assertEquals(1, ORDER.compare(a, b));
+    assertEquals(-1, ORDER.compare(b, a));
+
+    // c > b
+    assertEquals(1, ORDER.compare(c, b));
+    assertEquals(-1, ORDER.compare(b, c));
+
+    // c > a
+    assertEquals(1, ORDER.compare(c, a));
+    assertEquals(-1, ORDER.compare(a, c));
   }
 
   @Test
@@ -541,8 +585,9 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
         CPUS, 1.0
     ));
 
-    assertEquals(0, ORDER.compare(one, two));
+    assertEquals(1, ORDER.compare(one, two));
     assertEquals(1, ORDER.compare(one, three));
+    assertEquals(1, ORDER.compare(two, three));
   }
 
   private static ImmutableSet<PreemptionVictim> preemptionVictims(ScheduledTask... tasks) {
