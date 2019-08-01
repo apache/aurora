@@ -148,8 +148,14 @@ public final class TaskTestUtil {
         .setContactEmail("foo@bar.com")
         .setMetadata(ImmutableSet.of(new Metadata("key", "value")))
         .setMesosFetcherUris(ImmutableSet.of(
-            new MesosFetcherURI("pathA").setExtract(true).setCache(true),
-            new MesosFetcherURI("pathB").setExtract(true).setCache(true)))
+            new MesosFetcherURI("pathA")
+                .setExtract(true)
+                .setCache(true)
+                .setOutputFile("test_1"),
+            new MesosFetcherURI("pathB")
+                .setExtract(true)
+                .setCache(true)
+                .setOutputFile("test_2")))
         .setExecutorConfig(new org.apache.aurora.gen.ExecutorConfig(
             EXECUTOR_INFO.getName(),
             "config"))

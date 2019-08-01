@@ -14,6 +14,8 @@
   or a `VariableBatchUpdateStrategy` object. `QueueUpdateStrategy` and `BatchUpdateStrategy` take
   a single integer argument while `VariableBatchUpdateStrategy` takes a list of positive integers
   as an argument.
+- Users may now set a value for the URI fetcher to rename a downloaded artifact to after it
+  has been downloaded.
 
 ### Deprecations and removals:
 

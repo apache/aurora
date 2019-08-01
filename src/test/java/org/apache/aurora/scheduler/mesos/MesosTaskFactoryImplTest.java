@@ -167,15 +167,17 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .setCommand(executor.getCommand().toBuilder().addAllUris(
             ImmutableSet.of(
                 URI.newBuilder()
-                    .setValue("pathA")
-                    .setExecutable(false)
-                    .setExtract(true)
-                    .setCache(true).build(),
-                URI.newBuilder()
                     .setValue("pathB")
                     .setExecutable(false)
                     .setExtract(true)
-                    .setCache(true).build())))
+                    .setCache(true)
+                    .setOutputFile("test_2").build(),
+                URI.newBuilder()
+                    .setValue("pathA")
+                    .setExecutable(false)
+                    .setExtract(true)
+                    .setCache(true)
+                    .setOutputFile("test_1").build())))
         .build();
   }
 

@@ -41,10 +41,12 @@ import org.apache.aurora.scheduler.storage.entities.IDockerImage;
 import org.apache.aurora.scheduler.storage.entities.IImage;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IMesosContainer;
+import org.apache.aurora.scheduler.storage.entities.IMesosFetcherURI;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.CommandInfo;
+import org.apache.mesos.v1.Protos.CommandInfo.URI.Builder;
 import org.apache.mesos.v1.Protos.ContainerInfo;
 import org.apache.mesos.v1.Protos.DiscoveryInfo;
 import org.apache.mesos.v1.Protos.ExecutorID;
@@ -294,6 +296,20 @@ public interface MesosTaskFactory {
           .build();
     }
 
+    private static Protos.CommandInfo.URI toProtoURI(IMesosFetcherURI u) {
+      Builder builder = Protos.CommandInfo.URI.newBuilder()
+          .setValue(u.getValue())
+          .setExecutable(false)
+          .setExtract(u.isExtract())
+          .setCache(u.isCache());
+
+      if (u.isSetOutputFile()) {
+        builder.setOutputFile(u.getOutputFile());
+      }
+
+      return builder.build();
+    }
+
     @SuppressWarnings("deprecation") // we set the source field for backwards compat.
     private ExecutorInfo.Builder configureTaskForExecutor(
         IAssignedTask task,
@@ -315,12 +331,8 @@ public interface MesosTaskFactory {
                       .setKey(SOURCE_LABEL)
                       .setValue(sourceName)));
 
-      //TODO: (rdelvalle) add output_file when Aurora's Mesos dep is updated (MESOS-4735)
       List<CommandInfo.URI> mesosFetcherUris = task.getTask().getMesosFetcherUris().stream()
-          .map(u -> Protos.CommandInfo.URI.newBuilder().setValue(u.getValue())
-              .setExecutable(false)
-              .setExtract(u.isExtract())
-              .setCache(u.isCache()).build())
+          .map(u -> toProtoURI(u))
           .collect(Collectors.toList());
 
       builder.setCommand(builder.getCommand().toBuilder().addAllUris(mesosFetcherUris));

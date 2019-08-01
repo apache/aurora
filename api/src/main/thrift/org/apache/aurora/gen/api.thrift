@@ -152,6 +152,8 @@ struct MesosFetcherURI {
   2: optional bool extract
   /** Cache value using Mesos Fetcher caching mechanism **/
   3: optional bool cache
+  /** Filename for the resource that is downloaded **/
+  4: optional string outputFile
 }
 
 struct ExecutorConfig {
