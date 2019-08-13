@@ -17,6 +17,7 @@
 # checkstyle: noqa
 
 import itertools
+from functools import reduce
 
 from pystachio import Empty, List
 from twitter.common.lang import Compatibility
@@ -103,7 +104,7 @@ class Units(object):
   @classmethod
   def finalization_wait_max(cls, waits):
     """Return a finalization_wait that is the maximum of the inputs"""
-    return max([0] + map(cls.safe_get, waits))
+    return max([0] + [cls.safe_get(unit) for unit in waits])
 
   @classmethod
   def processes_merge(cls, tasks):
