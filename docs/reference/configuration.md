@@ -394,6 +394,7 @@ Update strategy which will wait until a maximum of ``batch_size`` number of inst
 | object                       | type     | description
 | ---------------------------- | :------: | ------------
 | ```batch_size```             | Integer  | Maximum number of shards to be updated in one iteration (Default: 1)
+| ```autopause_after_batch```             | Boolean  | Automatically pauses update after completing a batch. (Default: False)
 
 ### VariableBatchUpdateStrategy Objects
 
@@ -408,6 +409,7 @@ instances 20 instances are modified, the update groups would become: 2, 3, 5, 5,
 | object                       | type     | description
 | ---------------------------- | :------: | ------------
 | ```batch_sizes```             | List(Integer)  | Maximum number of shards to be updated per iteration. As each iteration completes, the next iteration's group size may change. If there are still instances that need to be updated after all sizes are used, the last size will be reused for the remainder of the update.
+| ```autopause_after_batch```             | Boolean  | Automatically pauses update before starting a new batch. (Default: False)
 
 #### Using the `sla_aware` option
 

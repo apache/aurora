@@ -59,6 +59,10 @@ function UpdateStrategy({ strategy }) {
     <tr>
       <td>Batch Size</td>
       <td>{ strategy.batchStrategy.groupSize }</td>
+    </tr>,
+    <tr>
+      <td>Auto Pause after Batch</td>
+      <td>{ strategy.batchStrategy.autopauseAfterBatch ? 'yes' : 'no' }</td>
     </tr>];
   } else if (!isNully(strategy.varBatchStrategy)) {
     return [<tr>
@@ -68,6 +72,10 @@ function UpdateStrategy({ strategy }) {
     <tr>
       <td>Batch Sizes</td>
       <td>{ strategy.varBatchStrategy.groupSizes.toString() }</td>
+    </tr>,
+    <tr>
+      <td>Auto Pause after Batch</td>
+      <td>{ strategy.varBatchStrategy.autopauseAfterBatch ? 'yes' : 'no' }</td>
     </tr>];
   }
 

@@ -167,6 +167,10 @@ final class JobUpdateStateMachine {
     return BLOCK_BEHAVIOR.get(status);
   }
 
+  static JobUpdateStatus getPausedState(JobUpdateStatus status) {
+    return PAUSE_BEHAVIOR.get(status);
+  }
+
   /**
    * Determines the action to take in response to a status change on a job update.
    *

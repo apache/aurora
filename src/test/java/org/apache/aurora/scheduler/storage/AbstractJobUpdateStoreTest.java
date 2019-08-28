@@ -632,7 +632,8 @@ public abstract class AbstractJobUpdateStoreTest {
         .setSettings(new JobUpdateSettings()
             .setBlockIfNoPulsesAfterMs(500)
             .setUpdateStrategy(
-                JobUpdateStrategy.batchStrategy(new BatchJobUpdateStrategy().setGroupSize(1)))
+                JobUpdateStrategy.batchStrategy(
+                    new BatchJobUpdateStrategy().setGroupSize(1).setAutopauseAfterBatch(true)))
             .setUpdateGroupSize(1) // TODO(rdelvalle): Remove when thrift field deprecated.
             .setMaxPerInstanceFailures(1)
             .setMaxFailedInstances(1)

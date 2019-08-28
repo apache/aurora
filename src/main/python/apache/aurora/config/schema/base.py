@@ -33,9 +33,11 @@ class QueueUpdateStrategy(Struct):
 
 class BatchUpdateStrategy(Struct):
   batch_size = Default(Integer, 1)
+  autopause_after_batch = Default(Boolean, False)
 
 class VariableBatchUpdateStrategy(Struct):
   batch_sizes = Required(List(Integer))
+  autopause_after_batch = Default(Boolean, False)
 
 class UpdateConfig(Struct):
   batch_size                  = Default(Integer, 1)

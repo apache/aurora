@@ -16,6 +16,13 @@
   as an argument.
 - Users may now set a value for the URI fetcher to rename a downloaded artifact to after it
   has been downloaded.
+- Auto pause feature added to VariableBatch strategy and Batch strategy. With this feature enabled,
+  when an update is ROLLING_FORWARD, the update will automatically pause itself right before
+  a new batch is started. (This feature is being released as tested but in beta state. We are
+  looking to collect feedback before we consider it fully stable.)
+- loader.load() now uses memoization on the config file path so that we only load and process
+  each config file once.
+- Instances run with custom executors will no longer show links to thermos observer.
 
 ### Deprecations and removals:
 
@@ -24,6 +31,9 @@
   instead. Note that these same constructs, as represented in the Aurora DSL, are still valid
   as they will be converted to the new field automatically by the client
   for backwards compatibility.
+- Backfill code for finding a matching tier to for a Job has been removed. Tier will now be set
+  when a Job is received by the scheduler. If no tier is provided, the default tier defined in
+  `-tier_config`.
 
 0.21.0
 ======
