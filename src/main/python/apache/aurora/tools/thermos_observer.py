@@ -61,6 +61,15 @@ app.add_option(
 
 
 app.add_option(
+    '--disable_task_resource_collection',
+    dest='disable_task_resource_collection',
+    default=False,
+    action='store_true',
+    help="Disable collection of CPU and memory statistics for each active task. Those can be "
+         "expensive to collect if there are hundreds of active tasks per host.")
+
+
+app.add_option(
     '--task_process_collection_interval_secs',
     dest='task_process_collection_interval_secs',
     type='int',
@@ -127,6 +136,7 @@ def initialize(options):
       path_detector,
       Amount(options.polling_interval_secs, Time.SECONDS),
       Amount(options.task_process_collection_interval_secs, Time.SECONDS),
+      disable_task_resource_collection=options.disable_task_resource_collection,
       enable_mesos_disk_collector=options.enable_mesos_disk_collector,
       disk_collector_settings=disk_collector_settings)
 

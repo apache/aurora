@@ -308,3 +308,25 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
                     'process_collection_interval and disk_collection_interval.')
 
     log.debug('Stopping resource monitoring for task "%s"', self._task_id)
+
+
+class NullTaskResourceMonitor(ResourceMonitorBase):
+  """ Alternative to TaskResourceMonitor that does not collect any resource metrics at all. It can
+      be used as fast replacement for TaskResourceMonitor. It is especially useful in setups where
+      metrics cannot be gathered reliable (e.g. when using PID namespaces).
+  """
+
+  def sample(self):
+    return self.sample_at(time.time())
+
+  def sample_at(self, timestamp):
+    return timestamp, self.AggregateResourceResult(0, ProcessSample.empty(), 0)
+
+  def sample_by_process(self, process_name):
+    return ProcessSample.empty()
+
+  def start(self):
+    pass
+
+  def kill(self):
+    pass

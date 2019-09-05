@@ -22,7 +22,6 @@ python_library(
     '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.lang',
     'api/src/main/thrift/org/apache/aurora/gen',
-    'src/main/python/apache/aurora/common',
     'src/main/python/apache/thermos/config',
   ],
   provides = setup_py(

@@ -23,6 +23,11 @@ Options:
   --polling_interval_secs=POLLING_INTERVAL_SECS
                         The number of seconds between observer refresh
                         attempts. [default: 5]
+  --disable_task_resource_collection
+                        Disable collection of CPU and memory statistics for
+                        each active task. Those can be expensive to collect if
+                        there are hundreds of active tasks per host. [default:
+                        False]
   --task_process_collection_interval_secs=TASK_PROCESS_COLLECTION_INTERVAL_SECS
                         The number of seconds between per task process
                         resource collections. [default: 20]

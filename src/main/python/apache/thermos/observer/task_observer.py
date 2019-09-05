@@ -33,8 +33,11 @@ from apache.thermos.common.path import TaskPath
 from apache.thermos.monitoring.disk import DiskCollectorSettings
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
-from apache.thermos.monitoring.resource import DiskCollectorProvider, TaskResourceMonitor
-
+from apache.thermos.monitoring.resource import (
+  DiskCollectorProvider,
+  NullTaskResourceMonitor,
+  TaskResourceMonitor
+)
 from .detector import ObserverTaskDetector
 from .observed_task import ActiveObservedTask, FinishedObservedTask
 
@@ -60,6 +63,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       path_detector,
       interval=POLLING_INTERVAL,
       task_process_collection_interval=TaskResourceMonitor.PROCESS_COLLECTION_INTERVAL,
+      disable_task_resource_collection=False,
       enable_mesos_disk_collector=False,
       disk_collector_settings=DiskCollectorSettings()):
 
@@ -71,6 +75,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     self._interval = interval
     self._task_process_collection_interval = task_process_collection_interval
     self._enable_mesos_disk_collector = enable_mesos_disk_collector
+    self._disable_task_resource_collection = disable_task_resource_collection
     self._disk_collector_settings = disk_collector_settings
     self._active_tasks = {}    # task_id => ActiveObservedTask
     self._finished_tasks = {}  # task_id => FinishedObservedTask
@@ -107,16 +112,21 @@ class TaskObserver(ExceptionalThread, Lockable):
       return
     task_monitor = TaskMonitor(root, task_id)
 
-    disk_collector_provider = DiskCollectorProvider(
-      self._enable_mesos_disk_collector,
-      self._disk_collector_settings)
+    if self._disable_task_resource_collection:
+      resource_monitor = NullTaskResourceMonitor()
 
-    resource_monitor = TaskResourceMonitor(
-        task_id,
-        task_monitor,
-        disk_collector_provider=disk_collector_provider,
-        process_collection_interval=self._task_process_collection_interval,
-        disk_collection_interval=self._disk_collector_settings.disk_collection_interval)
+    else:
+      disk_collector_provider = DiskCollectorProvider(
+        self._enable_mesos_disk_collector,
+        self._disk_collector_settings)
+
+      resource_monitor = TaskResourceMonitor(
+          task_id,
+          task_monitor,
+          disk_collector_provider=disk_collector_provider,
+          process_collection_interval=self._task_process_collection_interval,
+          disk_collection_interval=self._disk_collector_settings.disk_collection_interval)
+
     resource_monitor.start()
     self._active_tasks[task_id] = ActiveObservedTask(
         root,

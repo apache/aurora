@@ -25,6 +25,7 @@ from apache.thermos.monitoring.process import ProcessSample
 from apache.thermos.monitoring.resource import (
     DiskCollectorProvider,
     HistoryProvider,
+    NullTaskResourceMonitor,
     ResourceHistory,
     ResourceMonitorBase,
     TaskResourceMonitor
@@ -154,3 +155,17 @@ class TestTaskResourceMonitor(TestCase):
       task_resource_monitor.sample_by_process('fake-process-name')
 
     assert mock_get_active_processes.mock_calls == [mock.call(task_monitor)]
+
+
+class TestNullTaskResourceMonitor(TestCase):
+  def test_null_sample(self):
+    monitor = NullTaskResourceMonitor()
+    monitor.start()
+
+    null_aggregate = (0, ProcessSample.empty(), 0)
+
+    assert monitor.sample()[1] == null_aggregate
+    assert monitor.sample_at(time())[1] == null_aggregate
+    assert monitor.sample_by_process("any_process") == ProcessSample.empty()
+
+    monitor.kill()

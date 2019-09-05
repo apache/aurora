@@ -17,12 +17,16 @@
 - Users may now set a value for the URI fetcher to rename a downloaded artifact to after it
   has been downloaded.
 - Auto pause feature added to VariableBatch strategy and Batch strategy. With this feature enabled,
-  when an update is ROLLING_FORWARD, the update will automatically pause itself right before
+  when an update is `ROLLING_FORWARD`, the update will automatically pause itself right before
   a new batch is started. (This feature is being released as tested but in beta state. We are
   looking to collect feedback before we consider it fully stable.)
-- loader.load() now uses memoization on the config file path so that we only load and process
+- `loader.load()` now uses memoization on the config file path so that we only load and process
   each config file once.
 - Instances run with custom executors will no longer show links to thermos observer.
+- Add observer command line option `--disable_task_resource_collection` to disable the collection of
+  CPU, memory, and disk metrics for observed tasks. This is useful in setups where metrics cannot be
+  gathered reliable (e.g. when using PID namespaces) or when it is expensive due to hundreds of
+  active tasks per host.
 
 ### Deprecations and removals:
 
