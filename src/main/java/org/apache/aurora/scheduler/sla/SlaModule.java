@@ -39,6 +39,7 @@ import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.PositiveAmount;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory;
+import org.apache.aurora.scheduler.sla.SlaManager.SlaAwareKillNonProd;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 import org.asynchttpclient.channel.DefaultKeepAliveStrategy;
@@ -101,6 +102,11 @@ public class SlaModule extends AbstractModule {
             + "This does not apply to jobs that have a CoordinatorSlaPolicy."
     )
     public TimeAmount maxSlaDuration = new TimeAmount(2, Time.HOURS);
+
+    @Parameter(names = "-sla_aware_kill_non_prod",
+        description = "Enables SLA awareness for drain and and update for non-production tasks",
+        arity = 1)
+    public boolean slaAwareKillNonProd = false;
   }
 
   @VisibleForTesting
@@ -148,6 +154,10 @@ public class SlaModule extends AbstractModule {
     bind(new TypeLiteral<Integer>() { })
         .annotatedWith(SlaManager.MinRequiredInstances.class)
         .toInstance(options.minRequiredInstances);
+
+    bind(new TypeLiteral<Boolean>() { })
+        .annotatedWith(SlaAwareKillNonProd.class)
+        .toInstance(options.slaAwareKillNonProd);
 
     bind(new TypeLiteral<Integer>() { })
         .annotatedWith(SlaManager.MaxParallelCoordinators.class)

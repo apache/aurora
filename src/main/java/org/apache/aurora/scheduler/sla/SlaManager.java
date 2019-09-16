@@ -98,6 +98,11 @@ public class SlaManager extends AbstractIdleService {
   @interface MinRequiredInstances { }
 
   @VisibleForTesting
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  @interface SlaAwareKillNonProd { }
+
+  @VisibleForTesting
   static final String TASK_PARAM = "task";
 
   private static final String ATTEMPTS_STAT_NAME = "sla_coordinator_attempts";
@@ -113,6 +118,7 @@ public class SlaManager extends AbstractIdleService {
   private final Striped<Lock> lock;
   private final int minRequiredInstances;
   private final TierManager tierManager;
+  private final boolean slaAwareKillNonProd;
 
   private final AtomicLong attemptsCounter;
   private final AtomicLong successCounter;
@@ -131,7 +137,8 @@ public class SlaManager extends AbstractIdleService {
              IServerInfo serverInfo,
              @HttpClient AsyncHttpClient httpClient,
              TierManager tierManager,
-             StatsProvider statsProvider) {
+             StatsProvider statsProvider,
+             @SlaAwareKillNonProd boolean slaAwareKillNonProd) {
 
     this.executor = requireNonNull(executor);
     this.storage = requireNonNull(storage);
@@ -169,6 +176,7 @@ public class SlaManager extends AbstractIdleService {
           }
         }
     );
+    this.slaAwareKillNonProd = slaAwareKillNonProd;
   }
 
   private long getSlaDuration(ISlaPolicy slaPolicy) {
@@ -445,8 +453,8 @@ public class SlaManager extends AbstractIdleService {
   }
 
   private boolean skipSla(IScheduledTask task, long numActive) {
-    if (!tierManager.getTier(task.getAssignedTask().getTask()).isPreemptible()
-        && !tierManager.getTier(task.getAssignedTask().getTask()).isRevocable()) {
+    if (slaAwareKillNonProd
+        || tierManager.getTier(task.getAssignedTask().getTask()).isProduction()) {
       return numActive < minRequiredInstances;
     }
     return true;

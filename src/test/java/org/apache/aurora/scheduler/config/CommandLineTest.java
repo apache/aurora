@@ -241,6 +241,7 @@ public class CommandLineTest {
     expected.sla.slaProdMetrics = ImmutableList.of(MetricCategory.JOB_UPTIMES);
     expected.sla.slaNonProdMetrics = ImmutableList.of(MetricCategory.JOB_UPTIMES);
     expected.sla.slaRefreshInterval = TEST_TIME;
+    expected.sla.slaAwareKillNonProd = true;
     expected.webhook.webhookConfigFile = tempFile;
     expected.scheduler.maxRegistrationDelay = TEST_TIME;
     expected.scheduler.maxLeadingDuration = TEST_TIME;
@@ -326,6 +327,7 @@ public class CommandLineTest {
         "-sla_aware_action_max_batch_size=42",
         "-sla_aware_kill_retry_min_delay=42days",
         "-sla_aware_kill_retry_max_delay=42days",
+        "-sla_aware_kill_non_prod=true",
         "-task_assigner_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
         "-dlog_snapshot_interval=42days",
         "-dlog_max_entry_size=42GB",

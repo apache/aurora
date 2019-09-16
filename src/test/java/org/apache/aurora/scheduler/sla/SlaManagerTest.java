@@ -135,6 +135,10 @@ public class SlaManagerTest extends EasyMockTest {
                 .annotatedWith(SlaManager.MinRequiredInstances.class)
                 .toInstance(2);
 
+            bind(new TypeLiteral<Boolean>() { })
+                .annotatedWith(SlaManager.SlaAwareKillNonProd.class)
+                .toInstance(false);
+
             bind(new TypeLiteral<Integer>() { })
                 .annotatedWith(SlaManager.MaxParallelCoordinators.class)
                 .toInstance(10);
