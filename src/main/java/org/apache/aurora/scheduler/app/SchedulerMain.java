@@ -105,7 +105,7 @@ public class SchedulerMain {
     public enum DriverKind {
       // TODO(zmanji): Remove this option once V0_DRIVER has been proven out in production.
       // This is the original driver that libmesos shipped with. Uses unversioned protobufs, and has
-      // minimal backwards compatability guarantees.
+      // minimal backwards compatibility guarantees.
       SCHEDULER_DRIVER,
       // These are the new drivers that libmesos ships with. They use versioned (V1) protobufs for
       // the Java API.
@@ -113,7 +113,7 @@ public class SchedulerMain {
       // the V1 API (ie mesos maintenance).
       V0_DRIVER,
       // V1 Driver offers the V1 API over a full HTTP API implementation. It allows for maintenance
-      // primatives and other new features.
+      // primitives and other new features.
       V1_DRIVER,
     }
 

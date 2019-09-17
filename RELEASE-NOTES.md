@@ -27,6 +27,9 @@
   CPU, memory, and disk metrics for observed tasks. This is useful in setups where metrics cannot be
   gathered reliable (e.g. when using PID namespaces) or when it is expensive due to hundreds of
   active tasks per host.
+- Added flag `-sla_aware_kill_non_prod` which allows operators to enable SLA aware killing
+  for non-production jobs. Jobs are considered non-production when they are preemptable and/or
+  revocable.
 
 ### Deprecations and removals:
 
