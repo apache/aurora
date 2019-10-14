@@ -135,7 +135,8 @@ public class ConfigurationManagerTest {
           false,
           MIN_REQUIRED_INSTANCES,
           MAX_SLA_DURATION_SECS,
-          ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS),
+          ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS,
+          false),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL,
       TestExecutorSettings.THERMOS_EXECUTOR);
@@ -150,7 +151,8 @@ public class ConfigurationManagerTest {
           true,
           MIN_REQUIRED_INSTANCES,
           MAX_SLA_DURATION_SECS,
-          ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS),
+          ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS,
+          false),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL,
       TestExecutorSettings.THERMOS_EXECUTOR);
@@ -306,7 +308,8 @@ public class ConfigurationManagerTest {
             false,
             MIN_REQUIRED_INSTANCES,
             MAX_SLA_DURATION_SECS,
-            ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS),
+            ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS,
+            false),
         TaskTestUtil.TIER_MANAGER,
         TaskTestUtil.THRIFT_BACKFILL,
         TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(ITaskConfig.build(builder), 100);
@@ -332,7 +335,8 @@ public class ConfigurationManagerTest {
                     false,
                     MIN_REQUIRED_INSTANCES,
                     MAX_SLA_DURATION_SECS,
-                    ".+"),
+                    ".+",
+                    false),
             TaskTestUtil.TIER_MANAGER,
             TaskTestUtil.THRIFT_BACKFILL,
             TestExecutorSettings.THERMOS_EXECUTOR)
@@ -379,11 +383,42 @@ public class ConfigurationManagerTest {
           true,
           MIN_REQUIRED_INSTANCES,
           MAX_SLA_DURATION_SECS,
-          "b.r"),
+          "b.r",
+          false),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL,
       TestExecutorSettings.THERMOS_EXECUTOR)
             .validateAndPopulate(IJobConfiguration.build(jobConfiguration));
+  }
+
+  @Test
+  public void testSlaPolicyNonProdTiersEnabled() throws Exception {
+    ITaskConfig config = ITaskConfig.build(
+        CONFIG_WITH_CONTAINER
+            .newBuilder()
+            .setTier(TaskTestUtil.DEV_TIER_NAME)
+            .setSlaPolicy(SlaPolicy.countSlaPolicy(
+                new CountSlaPolicy()
+                    .setCount(MIN_REQUIRED_INSTANCES - 1))));
+
+    new ConfigurationManager(
+        new ConfigurationManagerSettings(
+            ALL_CONTAINER_TYPES,
+            true,
+            ImmutableList.of(new DockerParameter("foo", "bar")),
+            false,
+            true,
+            true,
+            true,
+            MIN_REQUIRED_INSTANCES,
+            MAX_SLA_DURATION_SECS,
+            ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS,
+            true),
+        TaskTestUtil.TIER_MANAGER,
+        TaskTestUtil.THRIFT_BACKFILL,
+        TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(
+        config,
+        MIN_REQUIRED_INSTANCES);
   }
 
   @Test

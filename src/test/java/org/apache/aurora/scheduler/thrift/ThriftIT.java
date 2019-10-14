@@ -192,7 +192,8 @@ public class ThriftIT extends EasyMockTest {
         false,
         20,
         1800,
-        ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS);
+        ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS,
+        false);
 
     createThrift(configurationManagerSettings);
 

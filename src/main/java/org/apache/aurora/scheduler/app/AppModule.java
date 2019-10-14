@@ -150,7 +150,8 @@ public class AppModule extends AbstractModule {
             opts.app.allowContainerVolumes,
             opts.sla.minRequiredInstances,
             opts.sla.maxSlaDuration.as(Time.SECONDS),
-            opts.app.allowedJobEnvironments),
+            opts.app.allowedJobEnvironments,
+            opts.sla.slaAwareKillNonProd),
         opts.main.driverImpl,
         opts);
   }

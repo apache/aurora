@@ -103,6 +103,7 @@ public class ConfigurationManager {
     private final Pattern allowedJobEnvironments;
     private final int minRequiredInstances;
     private final long maxSlaDurationSecs;
+    private final boolean slaAwareKillNonProd;
 
     public ConfigurationManagerSettings(
         ImmutableSet<Container._Fields> allowedContainerTypes,
@@ -114,7 +115,8 @@ public class ConfigurationManager {
         boolean allowContainerVolumes,
         int minRequiredInstances,
         long maxSlaDurationSecs,
-        String allowedJobEnvironment) {
+        String allowedJobEnvironment,
+        boolean slaAwareKillNonProd) {
 
       this.allowedContainerTypes = requireNonNull(allowedContainerTypes);
       this.allowDockerParameters = allowDockerParameters;
@@ -126,6 +128,7 @@ public class ConfigurationManager {
       this.allowedJobEnvironments = Pattern.compile(requireNonNull(allowedJobEnvironment));
       this.minRequiredInstances = minRequiredInstances;
       this.maxSlaDurationSecs = maxSlaDurationSecs;
+      this.slaAwareKillNonProd = slaAwareKillNonProd;
     }
   }
 
@@ -231,8 +234,8 @@ public class ConfigurationManager {
       int instanceCount) throws TaskDescriptionException {
 
     if (config.isSetSlaPolicy()) {
-      if (tierManager.getTier(ITaskConfig.build(config)).isRevocable()
-          || tierManager.getTier(ITaskConfig.build(config)).isPreemptible()) {
+      if (!(settings.slaAwareKillNonProd
+          || tierManager.getTier(ITaskConfig.build(config)).isProduction())) {
         throw new TaskDescriptionException(String.format(
             "Tier '%s' does not support SlaPolicy.",
             config.getTier()));

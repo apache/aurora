@@ -93,7 +93,8 @@ public final class TaskTestUtil {
           true,
           2,
           1800L,
-          ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS);
+          ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS,
+          false);
   public static final ExecutorID EXECUTOR_ID = ExecutorID.newBuilder()
       .setValue("PLACEHOLDER")
       .build();
