@@ -1,6 +1,6 @@
 ![Aurora Logo](docs/images/aurora_logo.png)
 
-[![Build Status](https://travis-ci.org/apache/aurora.svg?branch=master)](https://travis-ci.org/apache/aurora)
+![Build Status](https://github.com/apache/aurora/workflows/CI/badge.svg?branch=master)
 
 [Apache Aurora](https://aurora.apache.org/) lets you use an [Apache Mesos](http://mesos.apache.org)
 cluster as a private cloud. It supports running long-running services, cron jobs, and ad-hoc jobs.
