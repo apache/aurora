@@ -21,9 +21,9 @@ will be helpful to update this box and keep this cost low.
 
         $ vagrant box update --box bento/ubuntu-16.04
 
-    The box will be stored in version-specific directories under
+    The box will be stored in version-specific directory under
     `~/.vagrant.d/boxes/bento-VAGRANTSLASH-ubuntu-16.04/`.  Find the path to the `.ovf` file for the
-    latest version of the box.  In the following step, this path will be referred to as
+    latest version of the box.  For the remainder of this document, this path will be referred to as
     `$UBUNTU_OVF`.
 
 4. Build the new box
@@ -61,7 +61,7 @@ will be helpful to update this box and keep this cost low.
     Our boxes are stored in [Vagrant Cloud](https://vagrantcloud.com/apache-aurora/dev-environment).
 
     In order to upload a new version of our box, you must have committer access to upload
-    a dev image box, please ask in dev@aurora.apache.org, our IRC channel, or our Slack Channel
+    a dev image box, please ask in dev@aurora.apache.org or our Slack Channel
     if you would like to contribute. More info can be found by visiting our
     [community page](http://aurora.apache.org/community/).
 

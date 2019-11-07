@@ -16,8 +16,8 @@
 # An integration test for the client, using the vagrant environment as a testbed.
 set -eux
 
-readonly KRB5_MAJOR_MINOR=1.16
-readonly KRB5_VERSION=1.16
+readonly KRB5_MAJOR_MINOR=1.17
+readonly KRB5_VERSION=1.17
 readonly KRB5_URL_BASE=http://web.mit.edu/kerberos/dist/krb5/
 readonly KRB5_TARBALL=krb5-$KRB5_MAJOR_MINOR.tar.gz
 readonly KRB5_KEY_IDS=(5F8372DF 253AAB87 0055C305)
