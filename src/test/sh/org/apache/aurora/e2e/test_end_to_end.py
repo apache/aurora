@@ -23,13 +23,37 @@ import pytest
 test_agent_ip = "192.168.33.7"
 
 
-def _test_http_example_basic(cluster, role, env, base_config, updated_config, bad_healthcheck_config, job,
-                            *bind_parameters):
-    jobkey = f"{cluster}/{role}/{env}/{job}"
+def get_jobkey(cluster, role, env, job):
+    return f"{cluster}/{role}/{env}/{job}"
 
-    a_create(config=base_config, jobkey=jobkey)
-    a_observer_ui(cluster=cluster, role=role, job=job)
-    a_test_kill(jobkey=jobkey)
+
+def test_http_example_basic_revolcable():
+    _test_http_example_basic(job="http_example_revocable")
+
+
+def test_http_example_basic_gpu():
+    _test_http_example_basic(job="http_example_gpu")
+
+
+def test_http_example_basic():
+    _test_http_example_basic(job="http_example")
+
+
+def _test_http_example_basic(job):
+    test_root = "/vagrant/src/test/sh/org/apache/aurora/e2e/"
+    example_dir = test_root + "http/"
+    _cluster = "devcluster"
+    _role = "vagrant"
+    _env = "test"
+    _config_file = example_dir + "http_example.aurora"
+    _config_updated_file = example_dir + "http_example_updated.aurora"
+    _bad_healthcheck_config_updated_file = example_dir + "http_example_bad_healthcheck.aurora"
+
+    jobkey = get_jobkey(_cluster, _role, _env, job)
+
+    a_create(jobkey, _config_file)  # test_create $_jobkey $_base_config
+    a_observer_ui(_cluster, _role, job)  # test_observer_ui $_cluster $_role $_job
+    a_test_kill(jobkey)  # test_kill $_jobkey
 
 
 def test_http_example():
@@ -49,16 +73,16 @@ def test_http_example():
 
 
 def a_test_http_example(cluster, role, env, job, base_config, updated_config, bad_healthcheck_config):
-    jobkey = f"{cluster}/{role}/{env}/{job}"
-    task_id_prefix = f"{role}-{env}-{job}-0"
-    discovery_name = f"{job}.{env}.{role}"
+    jobkey = get_jobkey(cluster=cluster, role=role, env=env, job=job)
+    _task_id_prefix = f"{role}-{env}-{job}-0"
+    _discovery_name = f"{job}.{env}.{role}"
 
-    #  test_config(config=base_config, jobkey=jobkey)
+    check_config(config=base_config, jobkey=jobkey)
     # test_inspect(config=base_config, jobkey=jobkey)
     a_create(config=base_config, jobkey=jobkey)
     a_job_status(jobkey=jobkey)
     a_scheduler_ui(role=role, env=env, job=job)
-    a_test_observer_ui(cluster=cluster, role=role, job=job)
+    a_observer_ui(cluster=cluster, role=role, job=job)
     # test_discovery_info(task_id_prefix=task_id_prefix, discovery_name=discovery_name)
     #  test_thermos_profile(jobkey=jobkey)
     #  test_file_mount(jobkey=jobkey)
@@ -71,6 +95,17 @@ def a_test_http_example(cluster, role, env, job, base_config, updated_config, ba
     # test_run(jobkey=jobkey)
     a_test_kill(jobkey=jobkey)
     # test_quota(
+
+
+# test_config() {
+#   local _config=$1 _jobkey=$2
+#
+#   joblist=$(aurora config list $_config | tr -dc '[[:print:]]')
+#   [[ "$joblist" = *"$_jobkey"* ]]
+# }
+def check_config(jobkey, config):
+    c = check_output(["aurora", "config", "list", config])
+    print(f"output: {c}")
 
 
 def check_output(opts):
@@ -108,7 +143,7 @@ def a_scheduler_ui(role, env, job):
         assert r.status_code == requests.codes.ok
 
 
-def a_test_observer_ui(cluster, role, job):
+def a_observer_ui(cluster, role, job):
     observer_url = f"http://{test_agent_ip}:1338"
     r = requests.get(observer_url)
     assert r.status_code == requests.codes.ok
@@ -121,6 +156,7 @@ def a_test_observer_ui(cluster, role, job):
         r = requests.get(task_url.strip())
         if r.status_code == requests.codes.ok:
             assert True
+            return
         else:
             print("waiting...")
             time.sleep(1)
@@ -231,7 +267,7 @@ def a_test_quota(cluster, role):
 
 
 def a_test_kill(jobkey, *args):
-    subprocess.run(["aurora", "job", "kill", f"{jobkey}/1"])
+    # subprocess.run(["aurora", "job", "kill", f"{jobkey}/1"])
     subprocess.run(["aurora", "job", "killall", jobkey])
 
 

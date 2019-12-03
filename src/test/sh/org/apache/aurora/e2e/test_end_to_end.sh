@@ -983,11 +983,11 @@ test_health_check
 
 test_mesos_maintenance "${TEST_MAINTENANCE_JOB_ARGS[@]}"
 
-test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}"
+test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}" # <-- Migrated
 
-test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}"
+test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}" # <-- Migrated
 
-test_http_example_basic "${TEST_JOB_KILL_MESSAGE_ARGS[@]}"
+test_http_example_basic "${TEST_JOB_KILL_MESSAGE_ARGS[@]}" # <-- Migrated (N/A)
 
 test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 
