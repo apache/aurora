@@ -22,6 +22,7 @@ readonly KRB5_URL_BASE=http://web.mit.edu/kerberos/dist/krb5/
 readonly KRB5_TARBALL=krb5-$KRB5_MAJOR_MINOR.tar.gz
 readonly KRB5_KEY_IDS=(5F8372DF 253AAB87 0055C305)
 readonly SCHEDULER_HOSTNAME=aurora.local
+readonly LC_ALL=en_US.UTF-8
 
 function enter_vagrant {
   exec vagrant ssh -- /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh "$@"
@@ -31,7 +32,7 @@ function enter_testrealm {
   cd $HOME
     [[ -f $KRB5_TARBALL ]] || wget "$KRB5_URL_BASE/$KRB5_VERSION/$KRB5_TARBALL"
     [[ -f $KRB5_TARBALL.asc ]] || wget "$KRB5_URL_BASE/$KRB5_VERSION/$KRB5_TARBALL.asc"
-    gpg --list-keys ${KRB5_KEY_IDS[@]} &>/dev/null || gpg --keyserver pgp.mit.edu --recv-keys ${KRB5_KEY_IDS[@]}
+    gpg --list-keys ${KRB5_KEY_IDS[@]} &>/dev/null || gpg --keyserver keyserver.ubuntu.com --recv-keys ${KRB5_KEY_IDS[@]}
     gpg --verify $KRB5_TARBALL.asc
     [[ -d `basename $KRB5_TARBALL .tar.gz` ]] || tar zxvf $KRB5_TARBALL
     cd `basename $KRB5_TARBALL .tar.gz`
