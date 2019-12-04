@@ -83,7 +83,7 @@ def a_test_http_example(cluster, role, env, job, base_config, updated_config, ba
     a_job_status(jobkey=jobkey)
     a_scheduler_ui(role=role, env=env, job=job)
     a_observer_ui(cluster=cluster, role=role, job=job)
-    # test_discovery_info(task_id_prefix=task_id_prefix, discovery_name=discovery_name)
+    a_test_discovery_info(task_id_prefix=task_id_prefix, discovery_name=discovery_name)
     #  test_thermos_profile(jobkey=jobkey)
     #  test_file_mount(jobkey=jobkey)
     # test_restart(jobkey=jobkey)
@@ -164,39 +164,34 @@ def a_observer_ui(cluster, role, job):
     assert False
 
 
-def _test_discovery_info(task_id_prefix, discovery_name):
+def a_test_discovery_info(task_id_prefix, discovery_name):
     r = requests.get(f"http://{test_agent_ip}:5050/state")
-    if r.status_code != requests.codes.ok:
-        return False
+    assert r.status_code != requests.codes.ok
 
     framework_info = {}
     for framework in r.json()["frameworks"]:
         if framework["name"] == "Aurora":
             framework_info = framework
 
-    if not framework_info:
-        return False
+    assert framework_info
 
     task_info = {}
-    if not framework_info["tasks"]:
-        return False
+    assert framework_info["tasks"]
 
     for task in framework_info["tasks"]:
         if task["id"].startswith(task_id_prefix):
             task_info = task
 
-    if "discovery" not in task_info:
-        return False
+    assert "discovery" not in task_info
 
     discovery_info = task_info["discovery"]
     if "name" not in discovery_info or discovery_info["name"] != discovery_name:
-        return False
+        assert False
 
     if "ports" not in discovery_info or "ports" not in discovery_info["ports"]:
-        return False
+        assert False
 
-    if len(discovery_info["ports"]["ports"]) == 0:
-        return False
+    assert len(discovery_info["ports"]["ports"]) > 0
 
     return True
 
