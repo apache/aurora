@@ -32,7 +32,6 @@ import com.google.common.base.Functions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -639,6 +638,17 @@ class JobUpdateControllerImpl implements JobUpdateController {
   @VisibleForTesting
   static final String PULSE_TIMEOUT_MESSAGE = "Pulses from external service have timed out.";
 
+  // Determines whether it is necessary to skip evaluating a side effect if we will be pausing
+  // the update after this evaluation
+  private boolean skipSideEffect(
+      boolean pauseAfterBatch,
+      SideEffect sideEffect) {
+    return pauseAfterBatch
+        && Collections.disjoint(
+        sideEffect.getStatusChanges(),
+        InstanceUpdateStatus.TERMINAL_STATUSES);
+  }
+
   private void evaluateUpdater(
       final MutableStoreProvider storeProvider,
       final UpdateFactory.Update update,
@@ -667,18 +677,24 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     EvaluationResult<Integer> result = update.getUpdater().evaluate(changedInstance, stateProvider);
 
-    LOG.info(key + " evaluation result: " + result);
-
-    final boolean autoPauseAfterBatch =
-        isAutoPauseEnabled(instructions.getSettings().getUpdateStrategy());
-    if (autoPauseAfterBatch && maybeAutoPause(summary, result)) {
+    LOG.info("{} evaluation result: {}", key, result);
+    final boolean autoPauseAfterCurrentBatch =
+        isAutoPauseEnabled(instructions.getSettings().getUpdateStrategy())
+        && maybeAutoPause(summary, result);
+    if (autoPauseAfterCurrentBatch) {
       changeUpdateStatus(storeProvider,
           summary,
           newEvent(getPausedState(summary.getState().getStatus())).setMessage(UPDATE_AUTO_PAUSED));
-      return;
     }
 
     for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
+      // If we're pausing after processing this set of side effects, only process the side effects
+      // which are in a terminal state in order to avoid starting new shards after the pause
+      // has kicked in.
+      if (skipSideEffect(autoPauseAfterCurrentBatch, entry.getValue())) {
+        continue;
+      }
+
       Iterable<InstanceUpdateStatus> statusChanges;
 
       int instanceId = entry.getKey();
@@ -689,7 +705,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
           .collect(Collectors.toList());
 
       Set<JobUpdateAction> savedActions =
-          FluentIterable.from(savedEvents).transform(EVENT_TO_ACTION).toSet();
+          savedEvents.stream().map(EVENT_TO_ACTION).collect(Collectors.toSet());
 
       // Don't bother persisting a sequence of status changes that represents an instance that
       // was immediately recognized as being healthy and in the desired state.
@@ -747,34 +763,34 @@ class JobUpdateControllerImpl implements JobUpdateController {
         }
       }
 
-      if (autoPauseAfterBatch) {
-        instancesSeen.remove(key);
-      }
       changeUpdateStatus(storeProvider, summary, event);
-    } else {
-      LOG.info("Executing side-effects for update of " + key + ": " + result.getSideEffects());
-      for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
-        IInstanceKey instance = InstanceKeys.from(key.getJob(), entry.getKey());
+      return;
+    }
 
-        Optional<InstanceAction> action = entry.getValue().getAction();
-        if (action.isPresent()) {
-          Optional<InstanceActionHandler> handler = action.get().getHandler();
-          if (handler.isPresent()) {
-            Optional<Amount<Long, Time>> reevaluateDelay = handler.get().getReevaluationDelay(
-                instance,
-                instructions,
-                storeProvider,
-                stateManager,
-                updateAgentReserver,
-                updaterStatus,
-                key,
-                slaKillController);
-            if (reevaluateDelay.isPresent()) {
-              executor.schedule(
-                  getDeferredEvaluator(instance, key),
-                  reevaluateDelay.get().getValue(),
-                  reevaluateDelay.get().getUnit().getTimeUnit());
-            }
+    LOG.info("Executing side-effects for update of {}: {}",
+        key,
+        result.getSideEffects().entrySet());
+    for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
+      IInstanceKey instance = InstanceKeys.from(key.getJob(), entry.getKey());
+
+      Optional<InstanceAction> action = entry.getValue().getAction();
+      if (action.isPresent() && !skipSideEffect(autoPauseAfterCurrentBatch, entry.getValue())) {
+        Optional<InstanceActionHandler> handler = action.get().getHandler();
+        if (handler.isPresent()) {
+          Optional<Amount<Long, Time>> reevaluateDelay = handler.get().getReevaluationDelay(
+              instance,
+              instructions,
+              storeProvider,
+              stateManager,
+              updateAgentReserver,
+              updaterStatus,
+              key,
+              slaKillController);
+          if (reevaluateDelay.isPresent()) {
+            executor.schedule(
+                getDeferredEvaluator(instance, key),
+                reevaluateDelay.get().getValue(),
+                reevaluateDelay.get().getUnit().getTimeUnit());
           }
         }
       }
@@ -869,11 +885,9 @@ class JobUpdateControllerImpl implements JobUpdateController {
       Set<Integer> instancesCached = instancesSeen.get(key);
       Set<Integer> instancesBeingUpdated = result.getSideEffects().keySet();
 
-      // On the final batch, pause for acknowledgement and remove the cache of instances.
-      // This will cause the else branch to get run on resume and the update will finish.
       if (result.getStatus() == SUCCEEDED) {
         instancesSeen.remove(key);
-        return true;
+        return false;
       }
 
       // If the update evaluation is dealing with new instances, that signals we are at a barrier

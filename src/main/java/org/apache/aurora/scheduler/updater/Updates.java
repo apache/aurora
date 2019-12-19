@@ -81,7 +81,7 @@ public final class Updates {
   }
 
   /**
-   * Get the lastest {@link JobUpdateStatus} for an update.
+   * Get the latest {@link JobUpdateStatus} for an update.
    */
   static JobUpdateStatus getJobUpdateStatus(IJobUpdateDetails jobUpdateDetails) {
     return Iterables.getLast(jobUpdateDetails.getUpdateEvents()).getStatus();

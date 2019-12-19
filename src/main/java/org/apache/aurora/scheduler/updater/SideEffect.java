@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
 
@@ -139,6 +140,9 @@ public class SideEffect {
     /**
      * The instance failed to update and is no longer being monitored.
      */
-    FAILED
+    FAILED;
+
+    public static final Set<InstanceUpdateStatus> TERMINAL_STATUSES =
+        ImmutableSet.of(SUCCEEDED, FAILED);
   }
 }

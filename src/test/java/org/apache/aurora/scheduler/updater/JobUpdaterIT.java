@@ -1842,15 +1842,11 @@ public class JobUpdaterIT extends EasyMockTest {
     updater.start(update, AUDIT);
     actions.put(0, INSTANCE_UPDATING).putAll(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
-    changeState(JOB, 1, FINISHED, ASSIGNED, STARTING, RUNNING);
-    clock.advance(Amount.of(WATCH_TIMEOUT.getValue() / 2, Time.MILLISECONDS));
     changeState(JOB, 0, FINISHED, ASSIGNED, STARTING, RUNNING);
-    clock.advance(Amount.of(WATCH_TIMEOUT.getValue() / 2, Time.MILLISECONDS));
-
-    // Instance 1 finished first, but update does not yet proceed until 0 finishes.
-    actions.put(1, INSTANCE_UPDATED);
-    assertState(ROLLING_FORWARD, actions.build());
+    changeState(JOB, 1, FINISHED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
+
+    actions.put(0, INSTANCE_UPDATED).put(1, INSTANCE_UPDATED);
 
     // Update should now be paused
     assertState(ROLL_FORWARD_PAUSED, actions.build());
@@ -1858,7 +1854,6 @@ public class JobUpdaterIT extends EasyMockTest {
     // Continue the update
     updater.resume(UPDATE_ID, AUDIT);
 
-    actions.put(0, INSTANCE_UPDATED);
     actions.put(2, INSTANCE_UPDATING);
 
     assertState(ROLLING_FORWARD, actions.build());
@@ -1866,14 +1861,8 @@ public class JobUpdaterIT extends EasyMockTest {
     // Instance 2 is updated.
     changeState(JOB, 2, FINISHED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
-
-    // Update should now be paused for a second time
-    assertState(ROLL_FORWARD_PAUSED, actions.build());
-
-    // Continue the update
-    updater.resume(UPDATE_ID, AUDIT);
-
     actions.put(2, INSTANCE_UPDATED);
+
     assertState(ROLLED_FORWARD, actions.build());
 
     assertJobState(
@@ -1911,11 +1900,12 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 0, FINISHED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
 
+    actions.put(0, INSTANCE_UPDATED);
+
     // Update should now be paused after first batch is done.
     assertState(ROLL_FORWARD_PAUSED, actions.build());
     updater.resume(UPDATE_ID, AUDIT);
 
-    actions.put(0, INSTANCE_UPDATED);
     actions.put(1, INSTANCE_UPDATING).put(2, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
@@ -1926,33 +1916,25 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 1, FINISHED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
 
-    // Instance 2 will finish before instance 1
+    actions.put(1, INSTANCE_UPDATED);
     actions.put(2, INSTANCE_UPDATED);
 
     // Second autoPause at second barrier
     assertState(ROLL_FORWARD_PAUSED, actions.build());
 
     updater.resume(UPDATE_ID, AUDIT);
-    actions.put(1, INSTANCE_UPDATED);
     actions.put(3, INSTANCE_UPDATING).put(4, INSTANCE_UPDATING).put(5, INSTANCE_UPDATING);
 
     assertState(ROLLING_FORWARD, actions.build());
 
     // Third batch is moving forward.
-    // Make instance 4 the instance that waits for final transition to SUCCEED
-    changeState(JOB, 5, FINISHED, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 3, FINISHED, ASSIGNED, STARTING, RUNNING);
-    clock.advance(Amount.of(WATCH_TIMEOUT.getValue() / 3, Time.MILLISECONDS));
     changeState(JOB, 4, FINISHED, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 5, FINISHED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
 
-    actions.put(3, INSTANCE_UPDATED).put(5, INSTANCE_UPDATED);
+    actions.put(3, INSTANCE_UPDATED).put(4, INSTANCE_UPDATED).put(5, INSTANCE_UPDATED);
 
-    // Third barrier
-    assertState(ROLL_FORWARD_PAUSED, actions.build());
-    updater.resume(UPDATE_ID, AUDIT);
-
-    actions.put(4, INSTANCE_UPDATED);
     assertState(ROLLED_FORWARD, actions.build());
 
     assertJobState(
@@ -2001,11 +1983,13 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
 
+    actions.put(2, INSTANCE_UPDATED);
+
     // Update should now be paused after first batch is done.
     assertState(ROLL_FORWARD_PAUSED, actions.build());
     updater.resume(UPDATE_ID, AUDIT);
 
-    actions.put(2, INSTANCE_UPDATED).put(0, INSTANCE_UPDATING).put(1, INSTANCE_UPDATING);
+    actions.put(0, INSTANCE_UPDATING).put(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
     // Move on to batch two
