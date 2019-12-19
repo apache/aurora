@@ -14,3 +14,4 @@
 *.jpg binary
 *.odg binary
 *.ttf binary
+gradle/wrapper/gradle-wrapper.jar binary

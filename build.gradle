@@ -17,7 +17,7 @@ plugins {
   id 'com.github.hierynomus.license' version '0.11.0'
   id 'com.moowork.node' version '1.2.0'
   id 'me.champeau.gradle.jmh' version '0.4.4'
-  id "com.github.spotbugs" version "1.6.0"
+  id "com.github.spotbugs" version "1.6.4"
 }
 
 apply plugin: 'application'
@@ -141,7 +141,7 @@ project(':ui') {
     download = true
   }
 
-  task test(type: NpmTask, overwrite: true) {
+  task test_(type: NpmTask, overwrite: true) {
     inputs.files(fileTree('src'), fileTree('plugin'))
     outputs.files(fileTree('dist'))
     args = ['test']
