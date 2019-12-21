@@ -10,9 +10,9 @@ usage() {
   cat <<EOF
 Usage: make-mesos-native-egg.sh TARGET_DISTRIBUTION MESOS_VERSION AURORA_3RDPARTY_ROOT
 
-Build a mesos Python egg in a pristine Vagrant environment.
+Build a mesos Python egg in a Docker container.
 
-TARGET_DISTRIBUTION is one of (centos6, centos7, jessie64, trusty64, xenial64).
+TARGET_DISTRIBUTION is one of (centos6, centos7, stretch64, xenial64).
 MESOS_VERSION is a released version of mesos available on archive.apache.org.
 AURORA_3RDPARTY_ROOT is the path to a sparse checkout of the Aurora 3rdparty repo.
 EOF
@@ -42,7 +42,7 @@ fetch_and_build_mesos() {
 EOF
 }
 
-DEBIAN_JESSIE64_DEPENDENCIES=(
+DEBIAN_STRETCH64_DEPENDENCIES=(
   g++
   make
   libapr1-dev
@@ -56,47 +56,17 @@ DEBIAN_JESSIE64_DEPENDENCIES=(
   zlib1g-dev
   wget
 )
-build_debian_jessie64() {
+build_debian_stretch64() {
   local mesos_version=$1 output_basedir=$2
-  local python_outdir=$output_basedir/debian/jessie64/python
-  local image_name=debian:jessie-slim
+  local python_outdir=$output_basedir/debian/stretch64/python
+  local image_name=debian:stretch-slim
 
   pushd "$TMPDIR"
     docker run -i -v $(pwd):/mesos-egg $image_name bash <<EOF
       set -e -u
 
       apt-get update
-      apt-get -y install ${DEBIAN_JESSIE64_DEPENDENCIES[*]}
-      $(fetch_and_build_mesos "$mesos_version")
-EOF
-    mkdir -pv "$python_outdir"
-    cp -v mesos.executor*.egg "$python_outdir"
-  popd
-}
-
-UBUNTU_TRUSTY64_DEPENDENCIES=(
-  g++
-  libapr1-dev
-  libcurl4-nss-dev
-  libsasl2-dev
-  libsvn-dev
-  make
-  patch
-  python-dev
-  wget
-  zlib1g-dev
-)
-build_ubuntu_trusty64() {
-  local mesos_version=$1 output_basedir=$2
-  local python_outdir=$output_basedir/ubuntu/trusty64/python
-  local image_name=ubuntu:trusty
-
-  pushd "$TMPDIR"
-    docker run -i -v $(pwd):/mesos-egg $image_name bash <<EOF
-      set -e -u
-
-      sudo apt-get update
-      sudo apt-get -y install ${UBUNTU_TRUSTY64_DEPENDENCIES[*]}
+      apt-get -y install ${DEBIAN_STRETCH64_DEPENDENCIES[*]}
       $(fetch_and_build_mesos "$mesos_version")
 EOF
     mkdir -pv "$python_outdir"
@@ -221,11 +191,8 @@ main() {
   setup_tempdir
   pushd "$TMPDIR"
     case "$target_distribution" in
-      jessie64)
-        build_debian_jessie64 "$mesos_version" "$output_basedir"
-        ;;
-      trusty64)
-        build_ubuntu_trusty64 "$mesos_version" "$output_basedir"
+      stretch64)
+        build_debian_stretch64 "$mesos_version" "$output_basedir"
         ;;
       xenial64)
         build_ubuntu_xenial64 "$mesos_version" "$output_basedir"
