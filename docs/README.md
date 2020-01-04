@@ -5,7 +5,8 @@ long-running services, cron jobs, and ad-hoc jobs that take advantage of Apache 
 fault-tolerance, and resource isolation.
 
 We encourage you to ask questions on the [Aurora user list](http://aurora.apache.org/community/) or
-the `#aurora` IRC channel on `irc.freenode.net`.
+the `#aurora` Slack channel on `mesos.slack.com`.
+An invite can be obtained via `mesos-slackin.herokuapp.com`.
 
 
 ## Getting Started

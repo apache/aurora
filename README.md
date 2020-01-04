@@ -71,10 +71,11 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 - [Uber](https://www.uber.com)
 
 ## Getting Help
-If you have questions that aren't answered in our [documentation](https://aurora.apache.org/documentation/latest/), you can reach out to one of our [mailing lists](https://aurora.apache.org/community/). We're also often available in IRC: #aurora on
-[irc.freenode.net](http://webchat.freenode.net/?channels=#aurora).
+If you have questions that aren't answered in our [documentation](https://aurora.apache.org/documentation/latest/), you can reach out to one of our [mailing lists](https://aurora.apache.org/community/).
+We're also often available in Slack: #aurora on [mesos.slack.com](http://mesos.slack.com).
+Invites to our slack channel may be requested via [mesos-slackin.herokuapp.com](https://mesos-slackin.herokuapp.com/)
 
-You can also file bugs/issues in our [JIRA queue](http://issues.apache.org/jira/browse/AURORA).
+You can also file bugs/issues in our [Github](https://github.com/apache/aurora/issues) repo.
 
 
 ## License
