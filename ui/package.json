@@ -15,6 +15,8 @@
     "react-router-dom": "^4.2.2"
   },
   "devDependencies": {
+    "ajv": "^6.10.2",
+    "ajv-keywords": "^3.4.1",
     "babel-core": "^6.26.0",
     "babel-eslint": "^7.2.3",
     "babel-jest": "^21.2.0",
@@ -23,7 +25,7 @@
     "babel-plugin-transform-react-jsx": "^6.24.1",
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-react": "^6.24.1",
-    "css-loader": "^0.28.5",
+    "css-loader": "^3.4.1",
     "enzyme": "^3.0.0",
     "enzyme-adapter-react-16": "^1.0.0",
     "eslint": "^4.4.1",
@@ -43,7 +45,8 @@
     "sassjs-loader": "^1.0.0",
     "style-loader": "^0.18.2",
     "url-loader": "^0.6.2",
-    "webpack": "^2.6.1"
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10"
   },
   "jest": {
     "moduleDirectories": [

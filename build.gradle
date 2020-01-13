@@ -139,6 +139,7 @@ project(':ui') {
   apply plugin: 'com.moowork.node'
   node {
     download = true
+    version = '12.14.1'
   }
 
   task test_(type: NpmTask, overwrite: true) {
