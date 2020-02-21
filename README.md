@@ -1,6 +1,7 @@
 ![Aurora Logo](docs/images/aurora_logo.png)
 
-![Build Status](https://github.com/apache/aurora/workflows/CI/badge.svg?branch=master)
+**NOTE: The Apache Aurora project has been moved into the [Apache Attic](https://attic.apache.org/).
+A fork led by members of the former Project Management Committee (PMC) can be found at https://github.com/aurora-scheduler**
 
 [Apache Aurora](https://aurora.apache.org/) lets you use an [Apache Mesos](http://mesos.apache.org)
 cluster as a private cloud. It supports running long-running services, cron jobs, and ad-hoc jobs.
